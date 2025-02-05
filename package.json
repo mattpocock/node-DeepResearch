@@ -27,6 +27,7 @@
     "duck-duck-scrape": "^2.2.7",
     "express": "^4.21.2",
     "node-fetch": "^3.3.2",
+    "openai": "^4.82.0",
     "undici": "^7.3.0"
   },
   "devDependencies": {
