@@ -1,5 +1,6 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { SchemaType } from "@google/generative-ai";
+import { modelConfigs } from "../config";
+import { llmClient } from "../utils/llm-client";
 import { TokenTracker } from "../utils/token-tracker";
 
 import { DedupResponse } from '../types';
@@ -23,11 +24,10 @@ const responseSchema = {
   required: ["think", "unique_queries"]
 };
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
+const model = llmClient.getModel({
   model: modelConfigs.dedup.model,
+  temperature: modelConfigs.dedup.temperature,
   generationConfig: {
-    temperature: modelConfigs.dedup.temperature,
     responseMimeType: "application/json",
     responseSchema: responseSchema
   }

@@ -1,5 +1,6 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import {SchemaType} from "@google/generative-ai";
+import { modelConfigs } from "../config";
+import { llmClient } from "../utils/llm-client";
 import { TokenTracker } from "../utils/token-tracker";
 
 import { ErrorAnalysisResponse } from '../types';
@@ -23,11 +24,10 @@ const responseSchema = {
   required: ["recap", "blame", "improvement"]
 };
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
+const model = llmClient.getModel({
   model: modelConfigs.errorAnalyzer.model,
+  temperature: modelConfigs.errorAnalyzer.temperature,
   generationConfig: {
-    temperature: modelConfigs.errorAnalyzer.temperature,
     responseMimeType: "application/json",
     responseSchema: responseSchema
   }

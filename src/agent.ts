@@ -1,4 +1,4 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
+import {SchemaType} from "@google/generative-ai";
 import {readUrl} from "./tools/read";
 import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
@@ -7,7 +7,8 @@ import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
-import {GEMINI_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
+import {SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
+import {llmClient} from "./utils/llm-client";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, SchemaProperty, ResponseSchema, AnswerAction} from "./types";
@@ -356,10 +357,10 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       false
     );
 
-    const model = genAI.getGenerativeModel({
+    const model = llmClient.getModel({
       model: modelConfigs.agent.model,
+      temperature: modelConfigs.agent.temperature,
       generationConfig: {
-        temperature: modelConfigs.agent.temperature,
         responseMimeType: "application/json",
         responseSchema: getSchema(allowReflect, allowRead, allowAnswer, allowSearch)
       }
@@ -699,10 +700,10 @@ You decided to think out of the box or cut from a completely different angle.`);
       true
     );
 
-    const model = genAI.getGenerativeModel({
+    const model = llmClient.getModel({
       model: modelConfigs.agentBeastMode.model,
+      temperature: modelConfigs.agentBeastMode.temperature,
       generationConfig: {
-        temperature: modelConfigs.agentBeastMode.temperature,
         responseMimeType: "application/json",
         responseSchema: getSchema(false, false, allowAnswer, false)
       }
@@ -732,9 +733,6 @@ async function storeContext(prompt: string, memory: any[][], step: number) {
     console.error('Context storage failed:', error);
   }
 }
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-
 
 export async function main() {
   const question = process.argv[2] || "";
