@@ -13,6 +13,7 @@ export interface OpenAIFunctionParameter {
   properties?: Record<string, OpenAIFunctionParameter>;
   required?: string[];
   items?: OpenAIFunctionParameter;
+  [key: string]: any; // Add index signature for OpenAI's FunctionParameters compatibility
 }
 
 export interface OpenAIFunction {
