@@ -1,10 +1,9 @@
-import OpenAI from 'openai';
-import { OPENAI_API_KEY, modelConfigs } from "../config";
+import { ProviderFactory, AIProvider, isGeminiProvider, isOpenAIProvider } from '../utils/provider-factory';
+import { aiConfig, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-import { SearchAction, KeywordsResponse } from "../types";
+import { SearchAction, KeywordsResponse, ProviderType, OpenAIFunctionParameter } from "../types";
 import { z } from 'zod';
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+import { getProviderSchema } from '../utils/schema';
 
 const responseSchema = z.object({
   think: z.string().describe("Strategic reasoning about query complexity and search approach"),
@@ -91,32 +90,71 @@ Intention: ${action.think}
 `;
 }
 
+async function generateResponse(provider: AIProvider, prompt: string, providerType: ProviderType) {
+  if (!isGeminiProvider(provider) && !isOpenAIProvider(provider)) {
+    throw new Error('Invalid provider type');
+  }
+  switch (providerType) {
+    case 'gemini': {
+      if (!isGeminiProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }]}],
+        generationConfig: {
+          temperature: modelConfigs.queryRewriter.temperature,
+          maxOutputTokens: 1000
+        }
+      });
+      const response = await result.response;
+      return {
+        text: response.text(),
+        tokens: response.usageMetadata?.totalTokenCount || 0
+      };
+    }
+    case 'openai': {
+      if (!isOpenAIProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: modelConfigs.queryRewriter.model,
+        temperature: modelConfigs.queryRewriter.temperature,
+        max_tokens: 1000,
+        functions: [{
+          name: 'generate',
+          parameters: getProviderSchema('openai', responseSchema) as OpenAIFunctionParameter
+        }],
+        function_call: { name: 'generate' }
+      });
+      const functionCall = result.choices[0].message.function_call;
+      return {
+        text: functionCall?.arguments || '',
+        tokens: result.usage?.total_tokens || 0
+      };
+    }
+    case 'ollama':
+      throw new Error('Ollama support coming soon');
+    default:
+      throw new Error(`Unsupported provider type: ${providerType}`);
+  }
+}
+
 export async function rewriteQuery(action: SearchAction, tracker?: TokenTracker): Promise<{ queries: string[], tokens: number }> {
   try {
+    const provider = ProviderFactory.createProvider();
+    const providerType = aiConfig.defaultProvider;
     const prompt = getPrompt(action);
-    const result = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: modelConfigs.queryRewriter.model,
-      temperature: modelConfigs.queryRewriter.temperature,
-      max_tokens: 1000,
-      functions: [{
-        name: 'generate',
-        parameters: responseSchema.shape
-      }],
-      function_call: { name: 'generate' }
-    });
-
-    const functionCall = result.choices[0].message.function_call;
-    const responseData = functionCall ? JSON.parse(functionCall.arguments) as KeywordsResponse : null;
+    
+    const { text, tokens } = await generateResponse(provider, prompt, providerType);
+    const responseData = JSON.parse(text) as KeywordsResponse;
     if (!responseData) throw new Error('No valid response generated');
 
     console.log('Query rewriter:', responseData.queries);
-    const tokens = result.usage.total_tokens;
-    (tracker || new TokenTracker()).trackUsage('query-rewriter', tokens);
+    (tracker || new TokenTracker()).trackUsage('query-rewriter', tokens, providerType);
 
     return { queries: responseData.queries, tokens };
   } catch (error) {
     console.error('Error in query rewriting:', error);
+    if (error instanceof Error && error.message.includes('Ollama support')) {
+      throw new Error('Ollama provider is not yet supported for query rewriting');
+    }
     throw error;
   }
 }

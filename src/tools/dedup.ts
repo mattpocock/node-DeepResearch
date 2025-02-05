@@ -1,10 +1,9 @@
-import OpenAI from 'openai';
-import { OPENAI_API_KEY, modelConfigs } from "../config";
+import { ProviderFactory, AIProvider, isGeminiProvider, isOpenAIProvider } from '../utils/provider-factory';
+import { aiConfig, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-import { DedupResponse } from '../types';
+import { DedupResponse, ProviderType, OpenAIFunctionParameter } from '../types';
 import { z } from 'zod';
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+import { getProviderSchema } from '../utils/schema';
 
 const responseSchema = z.object({
   think: z.string().describe("Strategic reasoning about the overall deduplication approach"),
@@ -12,6 +11,52 @@ const responseSchema = z.object({
     z.string().describe("Unique query that passed the deduplication process, must be less than 30 characters")
   ).describe("Array of semantically unique queries")
 });
+
+async function generateResponse(provider: AIProvider, prompt: string, providerType: ProviderType) {
+  if (!isGeminiProvider(provider) && !isOpenAIProvider(provider)) {
+    throw new Error('Invalid provider type');
+  }
+  switch (providerType) {
+    case 'gemini': {
+      if (!isGeminiProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }]}],
+        generationConfig: {
+          temperature: modelConfigs.dedup.temperature,
+          maxOutputTokens: 1000
+        }
+      });
+      const response = await result.response;
+      return {
+        text: response.text(),
+        tokens: response.usageMetadata?.totalTokenCount || 0
+      };
+    }
+    case 'openai': {
+      if (!isOpenAIProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: modelConfigs.dedup.model,
+        temperature: modelConfigs.dedup.temperature,
+        max_tokens: 1000,
+        functions: [{
+          name: 'generate',
+          parameters: getProviderSchema('openai', responseSchema) as OpenAIFunctionParameter
+        }],
+        function_call: { name: 'generate' }
+      });
+      const functionCall = result.choices[0].message.function_call;
+      return {
+        text: functionCall?.arguments || '',
+        tokens: result.usage?.total_tokens || 0
+      };
+    }
+    case 'ollama':
+      throw new Error('Ollama support coming soon');
+    default:
+      throw new Error(`Unsupported provider type: ${providerType}`);
+  }
+}
 
 function getPrompt(newQueries: string[], existingQueries: string[]): string {
   return `You are an expert in semantic similarity analysis. Given a set of queries (setA) and a set of queries (setB)
@@ -67,29 +112,22 @@ SetB: ${JSON.stringify(existingQueries)}`;
 
 export async function dedupQueries(newQueries: string[], existingQueries: string[], tracker?: TokenTracker): Promise<{ unique_queries: string[], tokens: number }> {
   try {
+    const provider = ProviderFactory.createProvider();
+    const providerType = aiConfig.defaultProvider;
     const prompt = getPrompt(newQueries, existingQueries);
-    const result = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: modelConfigs.dedup.model,
-      temperature: modelConfigs.dedup.temperature,
-      max_tokens: 1000,
-      functions: [{
-        name: 'generate',
-        parameters: responseSchema.shape
-      }],
-      function_call: { name: 'generate' }
-    });
-
-    const functionCall = result.choices[0].message.function_call;
-    const responseData = functionCall ? JSON.parse(functionCall.arguments) as DedupResponse : null;
+    
+    const { text, tokens } = await generateResponse(provider, prompt, providerType);
+    const responseData = JSON.parse(text) as DedupResponse;
     if (!responseData) throw new Error('No valid response generated');
 
     console.log('Dedup:', responseData.unique_queries);
-    const tokens = result.usage.total_tokens;
-    (tracker || new TokenTracker()).trackUsage('dedup', tokens);
+    (tracker || new TokenTracker()).trackUsage('dedup', tokens, providerType);
     return { unique_queries: responseData.unique_queries, tokens };
   } catch (error) {
     console.error('Error in deduplication analysis:', error);
+    if (error instanceof Error && error.message.includes('Ollama support')) {
+      throw new Error('Ollama provider is not yet supported for deduplication');
+    }
     throw error;
   }
 }
@@ -99,9 +137,11 @@ export async function main() {
   const existingQueries = process.argv[3] ? JSON.parse(process.argv[3]) : [];
 
   try {
-    await dedupQueries(newQueries, existingQueries);
+    const result = await dedupQueries(newQueries, existingQueries);
+    console.log(JSON.stringify(result, null, 2));
   } catch (error) {
     console.error('Failed to deduplicate queries:', error);
+    process.exit(1);
   }
 }
 

@@ -1,15 +1,60 @@
-import OpenAI from 'openai';
-import { OPENAI_API_KEY, modelConfigs } from "../config";
+import { ProviderFactory, AIProvider, isGeminiProvider, isOpenAIProvider } from '../utils/provider-factory';
+import { aiConfig, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-import { EvaluationResponse } from '../types';
+import { EvaluationResponse, ProviderType, OpenAIFunctionParameter } from '../types';
 import { z } from 'zod';
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+import { getProviderSchema } from '../utils/schema';
 
 const responseSchema = z.object({
   is_definitive: z.boolean().describe("Whether the answer provides a definitive response without uncertainty or 'I don't know' type statements"),
   reasoning: z.string().describe("Explanation of why the answer is or isn't definitive")
 });
+
+async function generateResponse(provider: AIProvider, prompt: string, providerType: ProviderType) {
+  if (!isGeminiProvider(provider) && !isOpenAIProvider(provider)) {
+    throw new Error('Invalid provider type');
+  }
+  switch (providerType) {
+    case 'gemini': {
+      if (!isGeminiProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }]}],
+        generationConfig: {
+          temperature: modelConfigs.evaluator.temperature,
+          maxOutputTokens: 1000
+        }
+      });
+      const response = await result.response;
+      return {
+        text: response.text(),
+        tokens: response.usageMetadata?.totalTokenCount || 0
+      };
+    }
+    case 'openai': {
+      if (!isOpenAIProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: modelConfigs.evaluator.model,
+        temperature: modelConfigs.evaluator.temperature,
+        max_tokens: 1000,
+        functions: [{
+          name: 'generate',
+          parameters: getProviderSchema('openai', responseSchema) as OpenAIFunctionParameter
+        }],
+        function_call: { name: 'generate' }
+      });
+      const functionCall = result.choices[0].message.function_call;
+      return {
+        text: functionCall?.arguments || '',
+        tokens: result.usage?.total_tokens || 0
+      };
+    }
+    case 'ollama':
+      throw new Error('Ollama support coming soon');
+    default:
+      throw new Error(`Unsupported provider type: ${providerType}`);
+  }
+}
 
 function getPrompt(question: string, answer: string): string {
   return `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
@@ -47,21 +92,12 @@ Answer: ${JSON.stringify(answer)}`;
 
 export async function evaluateAnswer(question: string, answer: string, tracker?: TokenTracker): Promise<{ response: EvaluationResponse, tokens: number }> {
   try {
+    const provider = ProviderFactory.createProvider();
+    const providerType = aiConfig.defaultProvider;
     const prompt = getPrompt(question, answer);
-    const result = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: modelConfigs.evaluator.model,
-      temperature: modelConfigs.evaluator.temperature,
-      max_tokens: 1000,
-      functions: [{
-        name: 'generate',
-        parameters: responseSchema.shape
-      }],
-      function_call: { name: 'generate' }
-    });
-
-    const functionCall = result.choices[0].message.function_call;
-    const responseData = functionCall ? JSON.parse(functionCall.arguments) as EvaluationResponse : null;
+    
+    const { text, tokens } = await generateResponse(provider, prompt, providerType);
+    const responseData = JSON.parse(text) as EvaluationResponse;
     if (!responseData) throw new Error('No valid response generated');
 
     console.log('Evaluation:', {
@@ -69,11 +105,13 @@ export async function evaluateAnswer(question: string, answer: string, tracker?:
       reason: responseData.reasoning
     });
 
-    const tokens = result.usage.total_tokens;
-    (tracker || new TokenTracker()).trackUsage('evaluator', tokens);
+    (tracker || new TokenTracker()).trackUsage('evaluator', tokens, providerType);
     return { response: responseData, tokens };
   } catch (error) {
     console.error('Error in answer evaluation:', error);
+    if (error instanceof Error && error.message.includes('Ollama support')) {
+      throw new Error('Ollama provider is not yet supported for answer evaluation');
+    }
     throw error;
   }
 }
@@ -89,9 +127,11 @@ async function main() {
   }
 
   try {
-    await evaluateAnswer(question, answer);
+    const result = await evaluateAnswer(question, answer);
+    console.log(JSON.stringify(result, null, 2));
   } catch (error) {
     console.error('Failed to evaluate answer:', error);
+    process.exit(1);
   }
 }
 

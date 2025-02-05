@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { ProviderFactory, AIProvider, isGeminiProvider, isOpenAIProvider } from './utils/provider-factory';
 import {readUrl} from "./tools/read";
 import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
@@ -7,15 +7,60 @@ import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
-import {OPENAI_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
+import {aiConfig, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
 import { z } from 'zod';
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, SchemaProperty, ResponseSchema, AnswerAction} from "./types";
+import { StepAction, AnswerAction, ProviderType } from "./types";
 import {TrackerContext} from "./types";
 import {jinaSearch} from "./tools/jinaSearch";
+import { getProviderSchema } from './utils/schema';
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+async function generateResponse(provider: AIProvider, prompt: string, providerType: ProviderType, schema: any, modelConfig: any) {
+  if (!isGeminiProvider(provider) && !isOpenAIProvider(provider)) {
+    throw new Error('Invalid provider type');
+  }
+  switch (providerType) {
+    case 'gemini': {
+      if (!isGeminiProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }]}],
+        generationConfig: {
+          temperature: modelConfig.temperature,
+          maxOutputTokens: 1000
+        }
+      });
+      const response = await result.response;
+      return {
+        text: response.text(),
+        tokens: response.usageMetadata?.totalTokenCount || 0
+      };
+    }
+    case 'openai': {
+      if (!isOpenAIProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: modelConfig.model,
+        temperature: modelConfig.temperature,
+        max_tokens: 1000,
+        functions: [{
+          name: 'generate',
+          parameters: getProviderSchema('openai', schema)
+        }],
+        function_call: { name: 'generate' }
+      });
+      const functionCall = result.choices[0].message.function_call;
+      return {
+        text: functionCall?.arguments || '',
+        tokens: result.usage?.total_tokens || 0
+      };
+    }
+    case 'ollama':
+      throw new Error('Ollama support coming soon');
+    default:
+      throw new Error(`Unsupported provider type: ${providerType}`);
+  }
+}
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -26,7 +71,7 @@ async function sleep(ms: number) {
 function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean) {
   const actions: string[] = [];
   let schema = z.object({
-    action: z.enum([]).describe("Must match exactly one action type"),
+    action: z.enum(['dummy'] as [string, ...string[]]).describe("Must match exactly one action type"),
     think: z.string().describe("Explain why choose this action, what's the thought process behind choosing this action")
   });
 
@@ -327,23 +372,15 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       false
     );
 
-    const result = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: modelConfigs.agent.model,
-      temperature: modelConfigs.agent.temperature,
-      max_tokens: 1000,
-      functions: [{
-        name: 'generate',
-        parameters: getSchema(allowReflect, allowRead, allowAnswer, allowSearch)
-      }],
-      function_call: { name: 'generate' }
-    });
-
-    const functionCall = result.choices[0].message.function_call;
-    const responseData = functionCall ? JSON.parse(functionCall.arguments) as StepAction : null;
+    const provider = ProviderFactory.createProvider();
+    const providerType = aiConfig.defaultProvider;
+    const schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch);
+    
+    const { text, tokens } = await generateResponse(provider, prompt, providerType, schema, modelConfigs.agent);
+    const responseData = JSON.parse(text) as StepAction;
     if (!responseData) throw new Error('No valid response generated');
 
-    context.tokenTracker.trackUsage('agent', result.usage.total_tokens);
+    context.tokenTracker.trackUsage('agent', tokens, providerType);
     thisStep = responseData;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
@@ -672,23 +709,15 @@ You decided to think out of the box or cut from a completely different angle.`);
       true
     );
 
-    const result = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: modelConfigs.agentBeastMode.model,
-      temperature: modelConfigs.agentBeastMode.temperature,
-      max_tokens: 1000,
-      functions: [{
-        name: 'generate',
-        parameters: getSchema(false, false, allowAnswer, false)
-      }],
-      function_call: { name: 'generate' }
-    });
-
-    const functionCall = result.choices[0].message.function_call;
-    const responseData = functionCall ? JSON.parse(functionCall.arguments) as StepAction : null;
+    const provider = ProviderFactory.createProvider();
+    const providerType = aiConfig.defaultProvider;
+    const schema = getSchema(false, false, allowAnswer, false);
+    
+    const { text, tokens } = await generateResponse(provider, prompt, providerType, schema, modelConfigs.agentBeastMode);
+    const responseData = JSON.parse(text) as StepAction;
     if (!responseData) throw new Error('No valid response generated');
 
-    context.tokenTracker.trackUsage('agent', result.usage.total_tokens);
+    context.tokenTracker.trackUsage('agent', tokens, providerType);
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
     thisStep = responseData;
     console.log(thisStep)

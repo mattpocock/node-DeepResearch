@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-import { TokenUsage } from '../types';
+import { TokenUsage, ProviderType } from '../types';
 
 export class TokenTracker extends EventEmitter {
   private usages: TokenUsage[] = [];
@@ -11,15 +11,15 @@ export class TokenTracker extends EventEmitter {
     this.budget = budget;
   }
 
-  trackUsage(tool: string, tokens: number) {
+  trackUsage(tool: string, tokens: number, provider?: ProviderType) {
     const currentTotal = this.getTotalUsage();
     if (this.budget && currentTotal + tokens > this.budget) {
       console.error(`Token budget exceeded: ${currentTotal + tokens} > ${this.budget}`);
     }
     // Only track usage if we're within budget
     if (!this.budget || currentTotal + tokens <= this.budget) {
-      this.usages.push({ tool, tokens });
-      this.emit('usage', { tool, tokens });
+      this.usages.push({ tool, tokens, provider });
+      this.emit('usage', { tool, tokens, provider });
     }
   }
 
@@ -27,17 +27,31 @@ export class TokenTracker extends EventEmitter {
     return this.usages.reduce((sum, usage) => sum + usage.tokens, 0);
   }
 
-  getUsageBreakdown(): Record<string, number> {
-    return this.usages.reduce((acc, { tool, tokens }) => {
-      acc[tool] = (acc[tool] || 0) + tokens;
+  getUsageBreakdown(): Record<string, { total: number; byProvider: Record<string, number> }> {
+    return this.usages.reduce((acc, { tool, tokens, provider }) => {
+      if (!acc[tool]) {
+        acc[tool] = { total: 0, byProvider: {} };
+      }
+      acc[tool].total += tokens;
+      if (provider) {
+        acc[tool].byProvider[provider] = (acc[tool].byProvider[provider] || 0) + tokens;
+      }
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<string, { total: number; byProvider: Record<string, number> }>);
   }
 
   printSummary() {
     const breakdown = this.getUsageBreakdown();
+    const totalByProvider = this.usages.reduce((acc, { tokens, provider }) => {
+      if (provider) {
+        acc[provider] = (acc[provider] || 0) + tokens;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
     console.log('Token Usage Summary:', {
       total: this.getTotalUsage(),
+      byProvider: totalByProvider,
       breakdown
     });
   }

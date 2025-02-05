@@ -1,10 +1,9 @@
-import OpenAI from 'openai';
-import { OPENAI_API_KEY, modelConfigs } from "../config";
+import { ProviderFactory, AIProvider, isGeminiProvider, isOpenAIProvider } from '../utils/provider-factory';
+import { aiConfig, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-import { ErrorAnalysisResponse } from '../types';
+import { ErrorAnalysisResponse, ProviderType, OpenAIFunctionParameter } from '../types';
 import { z } from 'zod';
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+import { getProviderSchema } from '../utils/schema';
 
 const responseSchema = z.object({
   recap: z.string().describe("Recap of the actions taken and the steps conducted"),
@@ -100,23 +99,60 @@ ${diaryContext.join('\n')}
 `;
 }
 
+async function generateResponse(provider: AIProvider, prompt: string, providerType: ProviderType) {
+  if (!isGeminiProvider(provider) && !isOpenAIProvider(provider)) {
+    throw new Error('Invalid provider type');
+  }
+  switch (providerType) {
+    case 'gemini': {
+      if (!isGeminiProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }]}],
+        generationConfig: {
+          temperature: modelConfigs.errorAnalyzer.temperature,
+          maxOutputTokens: 1000
+        }
+      });
+      const response = await result.response;
+      return {
+        text: response.text(),
+        tokens: response.usageMetadata?.totalTokenCount || 0
+      };
+    }
+    case 'openai': {
+      if (!isOpenAIProvider(provider)) throw new Error('Invalid provider type');
+      const result = await provider.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: modelConfigs.errorAnalyzer.model,
+        temperature: modelConfigs.errorAnalyzer.temperature,
+        max_tokens: 1000,
+        functions: [{
+          name: 'generate',
+          parameters: getProviderSchema('openai', responseSchema) as OpenAIFunctionParameter
+        }],
+        function_call: { name: 'generate' }
+      });
+      const functionCall = result.choices[0].message.function_call;
+      return {
+        text: functionCall?.arguments || '',
+        tokens: result.usage?.total_tokens || 0
+      };
+    }
+    case 'ollama':
+      throw new Error('Ollama support coming soon');
+    default:
+      throw new Error(`Unsupported provider type: ${providerType}`);
+  }
+}
+
 export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracker): Promise<{ response: ErrorAnalysisResponse, tokens: number }> {
   try {
+    const provider = ProviderFactory.createProvider();
+    const providerType = aiConfig.defaultProvider;
     const prompt = getPrompt(diaryContext);
-    const result = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: modelConfigs.errorAnalyzer.model,
-      temperature: modelConfigs.errorAnalyzer.temperature,
-      max_tokens: 1000,
-      functions: [{
-        name: 'generate',
-        parameters: responseSchema.shape
-      }],
-      function_call: { name: 'generate' }
-    });
-
-    const functionCall = result.choices[0].message.function_call;
-    const responseData = functionCall ? JSON.parse(functionCall.arguments) as ErrorAnalysisResponse : null;
+    
+    const { text, tokens } = await generateResponse(provider, prompt, providerType);
+    const responseData = JSON.parse(text) as ErrorAnalysisResponse;
     if (!responseData) throw new Error('No valid response generated');
     
     console.log('Error analysis:', {
@@ -124,8 +160,7 @@ export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracke
       reason: responseData.blame || 'No issues found'
     });
     
-    const tokens = result.usage.total_tokens;
-    (tracker || new TokenTracker()).trackUsage('error-analyzer', tokens);
+    (tracker || new TokenTracker()).trackUsage('error-analyzer', tokens, providerType);
     return { response: responseData, tokens };
   } catch (error) {
     console.error('Error in answer evaluation:', error);

@@ -5,6 +5,32 @@ export enum SchemaType {
   OBJECT = 'OBJECT'
 }
 
+export type ProviderType = 'gemini' | 'openai' | 'ollama';
+
+export interface OpenAIFunctionParameter {
+  type: string;
+  description?: string;
+  properties?: Record<string, OpenAIFunctionParameter>;
+  required?: string[];
+  items?: OpenAIFunctionParameter;
+}
+
+export interface OpenAIFunction {
+  name: string;
+  parameters: OpenAIFunctionParameter;
+}
+
+export interface ProviderConfig {
+  type: ProviderType;
+  model: string;
+  temperature: number;
+}
+
+export interface AIConfig {
+  defaultProvider: ProviderType;
+  providers: Record<ProviderType, ProviderConfig>;
+}
+
 // Action Types
 type BaseAction = {
   action: "search" | "answer" | "reflect" | "visit";
@@ -41,6 +67,7 @@ export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitActi
 export interface TokenUsage {
   tool: string;
   tokens: number;
+  provider?: ProviderType;
 }
 
 export interface SearchResponse {
