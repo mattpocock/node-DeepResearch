@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
-import { GEMINI_API_KEY, OPENAI_API_KEY, llmConfig } from '../config';
+import {GEMINI_API_KEY, OPENAI_API_KEY, llmConfig, OPENAI_DEFAULT_MODEL, OPENAI_BASE_URL} from '../config';
 
 interface LLMClientOptions {
   model: string;
@@ -19,10 +19,10 @@ export class LLMClient {
     this.geminiClient = new GoogleGenerativeAI(GEMINI_API_KEY);
     if (llmConfig.provider === 'openai') {
       const config: { apiKey: string; baseURL?: string } = {
-        apiKey: llmConfig.apiKey || OPENAI_API_KEY || 'ollama'
+        apiKey: OPENAI_API_KEY || 'ollama'
       };
-      if (llmConfig.baseURL) {
-        config.baseURL = llmConfig.baseURL;
+      if (OPENAI_BASE_URL) {
+        config.baseURL = OPENAI_BASE_URL;
       }
       this.openaiClient = new OpenAI(config);
     }
@@ -30,11 +30,10 @@ export class LLMClient {
 
   async generateContent(model: any, prompt: string) {
     if (llmConfig.provider === 'gemini') {
-      const result = await model.generateContent(prompt);
-      return result;
+      return await model.generateContent(prompt);
     } else if (this.openaiClient) {
       const completion = await model.create({
-        model: llmConfig.model || "gpt-3.5-turbo",
+        model: OPENAI_DEFAULT_MODEL,
         messages: [{ role: "user", content: prompt }],
         temperature: model.temperature,
         response_format: { type: "json" }

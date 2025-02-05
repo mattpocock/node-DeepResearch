@@ -8,9 +8,6 @@ interface ModelConfig {
 
 interface LLMConfig {
   provider: 'gemini' | 'openai';
-  baseURL?: string;
-  apiKey?: string;
-  model?: string;
 }
 
 interface ToolConfigs {
@@ -42,12 +39,11 @@ export const BRAVE_API_KEY = process.env.BRAVE_API_KEY as string;
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
 export const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL;
 export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina'
+export const LLM_PROVIDER: 'gemini' | 'openai' = 'gemini';
+export const OPENAI_DEFAULT_MODEL = 'gpt-4o-mini';
 
 export const llmConfig: LLMConfig = {
-  provider: process.env.NODE_ENV === 'test' ? 'gemini' : 'gemini', // Force Gemini in tests
-  baseURL: OPENAI_BASE_URL,
-  apiKey: OPENAI_API_KEY,
-  model: 'gpt-3.5-turbo'
+  provider: LLM_PROVIDER,
 };
 
 const DEFAULT_MODEL = 'gemini-1.5-flash';
