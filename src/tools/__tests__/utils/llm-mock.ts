@@ -3,7 +3,7 @@ import { LLMClient, LLMClientConfig } from '../../../utils/llm-client';
 export class MockLLMClient implements LLMClient {
   constructor(private mockResponse: string = '{"queries": ["test query"]}') {}
 
-  getGenerativeModel(config: LLMClientConfig) {
+  getGenerativeModel(_config: LLMClientConfig) {
     return {
       generateContent: async () => ({
         response: {
