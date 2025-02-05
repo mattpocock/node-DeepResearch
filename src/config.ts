@@ -43,12 +43,12 @@ export const aiConfig: AIConfig = {
   providers: {
     gemini: {
       type: 'gemini',
-      model: 'gemini-flash-1.5',  // Updated to correct model name
+      model: 'gemini-pro',
       temperature: 0
     },
     openai: {
       type: 'openai',
-      model: 'gpt4o-mini',  // Updated to correct model name
+      model: 'gpt-3.5-turbo',
       temperature: 0
     },
     ollama: {
