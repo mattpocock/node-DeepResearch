@@ -84,7 +84,7 @@ export class LocalLLMClient implements LLMClient {
               type: 'json_schema',
               json_schema: config.generationConfig?.responseSchema,
             },
-            max_tokens: 1000,
+            max_tokens: 8192,
             stream: false,
           }),
         });
