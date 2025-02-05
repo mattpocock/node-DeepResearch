@@ -27,7 +27,7 @@ export function readUrl(url: string, token: string, tracker?: TokenTracker): Pro
       res.on('data', (chunk) => responseData += chunk);
       res.on('end', () => {
         const response = JSON.parse(responseData) as ReadResponse;
-        console.log('Raw read response:', response);
+        // console.log('Raw read response:', response);
 
         if (response.code === 402) {
           reject(new Error(response.readableMessage || 'Insufficient balance'));
