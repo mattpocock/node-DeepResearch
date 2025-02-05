@@ -1,7 +1,6 @@
 import { dedupQueries } from '../dedup';
 import { MockLLMClient } from './utils/llm-mock';
 import { TEST_RESPONSES } from './utils/test-config';
-import * as config from '../../config';
 
 jest.mock('../../config', () => ({
   ...jest.requireActual('../../config'),
