@@ -13,7 +13,7 @@ interface LLMClientOptions {
 
 export class LLMClient {
   private geminiClient: GoogleGenerativeAI;
-  private openaiClient: OpenAI;
+  private openaiClient?: OpenAI;
   
   constructor() {
     this.geminiClient = new GoogleGenerativeAI(GEMINI_API_KEY);
