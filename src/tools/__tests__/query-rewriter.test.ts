@@ -1,5 +1,7 @@
 import { rewriteQuery } from '../query-rewriter';
 
+jest.setTimeout(10000);
+
 describe('rewriteQuery', () => {
   it('should rewrite search query', async () => {
     const { queries } = await rewriteQuery({

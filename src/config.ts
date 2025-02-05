@@ -39,7 +39,7 @@ export const BRAVE_API_KEY = process.env.BRAVE_API_KEY as string;
 export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina';
 
 export const aiConfig: AIConfig = {
-  defaultProvider: 'gemini' as ProviderType,
+  defaultProvider: 'openai' as ProviderType,
   providers: {
     gemini: {
       type: 'gemini',
