@@ -3,8 +3,7 @@ import { LLMClient, LLMClientConfig } from '../../../utils/llm-client';
 export class MockLLMClient implements LLMClient {
   constructor(private mockResponse: string = '{"queries": ["test query"]}') {}
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-params
-  getGenerativeModel(config: LLMClientConfig) {
+  getGenerativeModel(_: LLMClientConfig) {
     return {
       generateContent: async () => ({
         response: {
