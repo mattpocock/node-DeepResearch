@@ -9,6 +9,8 @@ interface ModelConfig {
 interface LLMConfig {
   provider: 'gemini' | 'openai';
   baseURL?: string;
+  apiKey?: string;
+  model?: string;
 }
 
 interface ToolConfigs {
@@ -43,7 +45,9 @@ export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina'
 
 export const llmConfig: LLMConfig = {
   provider: 'gemini',
-  baseURL: OPENAI_BASE_URL
+  baseURL: OPENAI_BASE_URL,
+  apiKey: OPENAI_API_KEY,
+  model: 'gpt-3.5-turbo'
 };
 
 const DEFAULT_MODEL = 'gemini-1.5-flash';

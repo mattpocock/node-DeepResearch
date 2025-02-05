@@ -18,10 +18,13 @@ export class LLMClient {
   constructor() {
     this.geminiClient = new GoogleGenerativeAI(GEMINI_API_KEY);
     if (llmConfig.provider === 'openai') {
-      this.openaiClient = new OpenAI({
-        apiKey: OPENAI_API_KEY,
-        baseURL: llmConfig.baseURL
-      });
+      const config: { apiKey: string; baseURL?: string } = {
+        apiKey: llmConfig.apiKey || OPENAI_API_KEY || 'ollama'
+      };
+      if (llmConfig.baseURL) {
+        config.baseURL = llmConfig.baseURL;
+      }
+      this.openaiClient = new OpenAI(config);
     }
   }
 
@@ -31,7 +34,7 @@ export class LLMClient {
       return result;
     } else if (this.openaiClient) {
       const completion = await model.create({
-        model: "gpt-3.5-turbo",
+        model: llmConfig.model || "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
         temperature: model.temperature,
         response_format: { type: "json" }
@@ -52,6 +55,9 @@ export class LLMClient {
     if (llmConfig.provider === 'gemini') {
       return this.geminiClient.getGenerativeModel(options);
     } else if (this.openaiClient) {
+      if (!this.openaiClient) {
+        throw new Error('OpenAI client not initialized. Set OPENAI_API_KEY and provider="openai" to use OpenAI.');
+      }
       return {
         ...this.openaiClient.chat.completions,
         temperature: options.temperature,
