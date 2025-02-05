@@ -15,31 +15,62 @@ interface ToolConfigs {
   agentBeastMode: ModelConfig;
 }
 
-import { GenerateContentResult, GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface LLMClientConfig {
   model: string;
   temperature: number;
   generationConfig?: {
-    temperature: number;
-    responseMimeType: string;
-    responseSchema: any;
+    responseMimeType?: string;
+    responseSchema?: any;
+  };
+}
+
+interface LLMResponse {
+  text(): string;
+  usageMetadata: {
+    totalTokenCount: number;
   };
 }
 
 interface LLMClient {
   getGenerativeModel(config: LLMClientConfig): {
-    generateContent(prompt: string): Promise<GenerateContentResult>;
+    generateContent(prompt: string): Promise<{
+      response: LLMResponse;
+    }>;
   };
 }
 
-interface GenerateContentResult {
-  response: {
-    text(): string;
-    usageMetadata: {
-      totalTokenCount: number;
+class GoogleAIWrapper implements LLMClient {
+  private client: GoogleGenerativeAI;
+
+  constructor(apiKey: string) {
+    this.client = new GoogleGenerativeAI(apiKey);
+  }
+
+  getGenerativeModel(config: LLMClientConfig) {
+    const model = this.client.getGenerativeModel({
+      model: config.model,
+      generationConfig: {
+        temperature: config.temperature,
+        ...(config.generationConfig || {})
+      }
+    });
+
+    return {
+      generateContent: async (prompt: string) => {
+        const result = await model.generateContent(prompt);
+        return {
+          response: {
+            text: () => result.response.text(),
+            usageMetadata: {
+              totalTokenCount: result.response.usageMetadata?.totalTokenCount ?? 0
+            }
+          }
+        };
+      }
     };
-  };
+  }
 }
 
 class LocalLLMClient implements LLMClient {
@@ -65,7 +96,7 @@ class LocalLLMClient implements LLMClient {
                 content: prompt,
               },
             ],
-            temperature: config.generationConfig?.temperature ?? config.temperature,
+            temperature: config.temperature,
             response_format: {
               type: 'json_schema',
               json_schema: config.generationConfig?.responseSchema,
@@ -117,7 +148,7 @@ export const LLM_PROVIDER = process.env.LLM_PROVIDER || 'gemini';
 // Initialize LLM client based on configuration
 export const llmClient: LLMClient = LLM_PROVIDER === 'local' && LOCAL_LLM_HOSTNAME && LOCAL_LLM_PORT && LOCAL_LLM_MODEL
   ? new LocalLLMClient(LOCAL_LLM_HOSTNAME, LOCAL_LLM_PORT, LOCAL_LLM_MODEL)
-  : new GoogleGenerativeAI(GEMINI_API_KEY);
+  : new GoogleAIWrapper(GEMINI_API_KEY);
 
 const DEFAULT_MODEL = 'gemini-1.5-flash';
 

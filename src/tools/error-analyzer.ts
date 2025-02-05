@@ -25,8 +25,8 @@ const responseSchema = {
 
 const model = llmClient.getGenerativeModel({
   model: modelConfigs.errorAnalyzer.model,
+  temperature: modelConfigs.errorAnalyzer.temperature,
   generationConfig: {
-    temperature: modelConfigs.errorAnalyzer.temperature,
     responseMimeType: "application/json",
     responseSchema: responseSchema
   }

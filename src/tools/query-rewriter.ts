@@ -28,8 +28,8 @@ const responseSchema = {
 
 const model = llmClient.getGenerativeModel({
   model: modelConfigs.queryRewriter.model,
+  temperature: modelConfigs.queryRewriter.temperature,
   generationConfig: {
-    temperature: modelConfigs.queryRewriter.temperature,
     responseMimeType: "application/json",
     responseSchema: responseSchema
   }
