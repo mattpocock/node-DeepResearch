@@ -1,4 +1,4 @@
-import { GoogleAIWrapper, LocalLLMClient } from '../utils/llm-client';
+import type { GoogleAIWrapper, LocalLLMClient } from '../utils/llm-client';
 
 describe('LLM Client', () => {
   const originalEnv = process.env;
