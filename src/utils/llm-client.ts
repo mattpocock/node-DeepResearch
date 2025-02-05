@@ -55,13 +55,14 @@ export class LLMClient {
     if (llmConfig.provider === 'gemini') {
       return this.geminiClient.getGenerativeModel(options);
     } else if (this.openaiClient) {
-      if (!this.openaiClient) {
+      const client = this.openaiClient;
+      if (!client) {
         throw new Error('OpenAI client not initialized. Set OPENAI_API_KEY and provider="openai" to use OpenAI.');
       }
       return {
-        ...this.openaiClient.chat.completions,
+        ...client.chat.completions,
         temperature: options.temperature,
-        generateContent: (prompt: string) => this.generateContent(this.openaiClient.chat.completions, prompt)
+        generateContent: (prompt: string) => this.generateContent(client.chat.completions, prompt)
       };
     }
     throw new Error('OpenAI client not initialized. Set OPENAI_API_KEY and provider="openai" to use OpenAI.');
