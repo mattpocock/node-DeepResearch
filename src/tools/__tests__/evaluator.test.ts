@@ -1,5 +1,13 @@
 import { evaluateAnswer } from '../evaluator';
 import { TokenTracker } from '../../utils/token-tracker';
+import { MockLLMClient } from './utils/llm-mock';
+import { TEST_RESPONSES } from './utils/test-config';
+import * as config from '../../config';
+
+jest.mock('../../config', () => ({
+  ...jest.requireActual('../../config'),
+  llmClient: new MockLLMClient(TEST_RESPONSES.evaluator)
+}));
 
 describe('evaluateAnswer', () => {
   it('should evaluate answer definitiveness', async () => {
