@@ -1,5 +1,5 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { SchemaType } from "@google/generative-ai";
+import { modelConfigs, llmClient } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 import { SearchAction } from "../types";
 
@@ -26,8 +26,7 @@ const responseSchema = {
   required: ["think", "queries"]
 };
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
+const model = llmClient.getGenerativeModel({
   model: modelConfigs.queryRewriter.model,
   generationConfig: {
     temperature: modelConfigs.queryRewriter.temperature,
