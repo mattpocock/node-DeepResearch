@@ -1,4 +1,17 @@
 import { GoogleAIWrapper, LocalLLMClient } from '../utils/llm-client';
+import { llmClient } from '../config';
+
+jest.mock('../config', () => {
+  let mockConfig = { llmClient: null };
+  return {
+    get llmClient() {
+      return mockConfig.llmClient;
+    },
+    __setMockConfig: (config: { llmClient: any }) => {
+      mockConfig = config;
+    }
+  };
+});
 
 describe('LLM Client', () => {
   const originalEnv = process.env;
@@ -12,19 +25,23 @@ describe('LLM Client', () => {
     process.env = originalEnv;
   });
 
-  it('should use GoogleAIWrapper by default', async () => {
+  it('should use GoogleAIWrapper by default', () => {
     process.env.LLM_PROVIDER = 'gemini';
     process.env.GEMINI_API_KEY = 'test-key';
-    const config = await import('../config');
-    expect(config.llmClient).toBeInstanceOf(GoogleAIWrapper);
+    jest.isolateModules(() => {
+      const { llmClient } = require('../config');
+      expect(llmClient).toBeInstanceOf(GoogleAIWrapper);
+    });
   });
 
-  it('should use LocalLLMClient when configured', async () => {
+  it('should use LocalLLMClient when configured', () => {
     process.env.LLM_PROVIDER = 'local';
     process.env.LOCAL_LLM_HOSTNAME = 'localhost';
     process.env.LOCAL_LLM_PORT = '8000';
     process.env.LOCAL_LLM_MODEL = 'test-model';
-    const config = await import('../config');
-    expect(config.llmClient).toBeInstanceOf(LocalLLMClient);
+    jest.isolateModules(() => {
+      const { llmClient } = require('../config');
+      expect(llmClient).toBeInstanceOf(LocalLLMClient);
+    });
   });
 });
