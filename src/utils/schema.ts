@@ -110,14 +110,8 @@ export function getProviderSchema(provider: ProviderType, schema: z.ZodSchema): 
     case 'gemini':
       return convertToGeminiSchema(schema);
     case 'openai':
-    case 'ollama': {
-      const functionSchema = convertToOpenAIFunctionSchema(schema);
-      return {
-        type: 'object',
-        properties: functionSchema.properties,
-        required: functionSchema.required
-      };
-    }
+    case 'ollama':
+      return convertToOpenAIFunctionSchema(schema);
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }

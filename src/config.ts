@@ -43,7 +43,7 @@ export const aiConfig: AIConfig = {
   providers: {
     gemini: {
       type: 'gemini',
-      model: 'gemini-pro',
+      model: 'gemini-1.5-pro',
       temperature: 0
     },
     openai: {
