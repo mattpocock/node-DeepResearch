@@ -1,6 +1,10 @@
 import { dedupQueries } from '../dedup';
+import { setupTestLLMConfig } from './test-helpers';
 
 describe('dedupQueries', () => {
+  beforeEach(() => {
+    setupTestLLMConfig();
+  });
   it('should remove duplicate queries', async () => {
     const queries = ['typescript tutorial', 'typescript tutorial', 'javascript basics'];
     const { unique_queries } = await dedupQueries(queries, []);

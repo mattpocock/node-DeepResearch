@@ -44,7 +44,7 @@ export const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL;
 export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina'
 
 export const llmConfig: LLMConfig = {
-  provider: 'gemini',
+  provider: process.env.NODE_ENV === 'test' ? 'gemini' : 'gemini', // Force Gemini in tests
   baseURL: OPENAI_BASE_URL,
   apiKey: OPENAI_API_KEY,
   model: 'gpt-3.5-turbo'

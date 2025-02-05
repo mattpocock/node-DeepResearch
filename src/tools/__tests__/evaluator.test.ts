@@ -1,7 +1,11 @@
 import { evaluateAnswer } from '../evaluator';
 import { TokenTracker } from '../../utils/token-tracker';
+import { setupTestLLMConfig } from './test-helpers';
 
 describe('evaluateAnswer', () => {
+  beforeEach(() => {
+    setupTestLLMConfig();
+  });
   it('should evaluate answer definitiveness', async () => {
     const tokenTracker = new TokenTracker();
     const { response } = await evaluateAnswer(

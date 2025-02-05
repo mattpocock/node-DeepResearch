@@ -1,6 +1,10 @@
 import { rewriteQuery } from '../query-rewriter';
+import { setupTestLLMConfig } from './test-helpers';
 
 describe('rewriteQuery', () => {
+  beforeEach(() => {
+    setupTestLLMConfig();
+  });
   it('should rewrite search query', async () => {
     const { queries } = await rewriteQuery({
       action: 'search',
