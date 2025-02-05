@@ -81,6 +81,47 @@ npm run dev "who will be president of US in 2028?"
 npm run dev "what should be jina ai strategy for 2025?"
 ```
 
+## Local LLM Support
+
+DeepResearch supports using a local LLM server that implements the OpenAI-compatible chat completions API. To use a local LLM:
+
+```bash
+# Configure local LLM settings
+export LLM_PROVIDER=local
+export LOCAL_LLM_HOSTNAME=localhost  # Your LLM server hostname
+export LOCAL_LLM_PORT=8000          # Your LLM server port
+export LOCAL_LLM_MODEL=llama2       # Your model name
+
+# Run with local LLM
+npm run dev "your query here"
+```
+
+The local LLM server must implement the OpenAI-compatible chat completions API endpoint:
+```bash
+POST http://${LOCAL_LLM_HOSTNAME}:${LOCAL_LLM_PORT}/v1/chat/completions
+Content-Type: application/json
+
+{
+  "model": "${LOCAL_LLM_MODEL}",
+  "messages": [
+    {
+      "role": "user",
+      "content": "your prompt"
+    }
+  ],
+  "temperature": 0.7,
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "type": "object",
+      "properties": {
+        // Response schema specific to each tool
+      }
+    }
+  }
+}
+```
+
 ## Web Server API
 
 Start the server:
