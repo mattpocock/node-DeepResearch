@@ -1,32 +1,14 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import OpenAI from 'openai';
+import { OPENAI_API_KEY, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-
 import { EvaluationResponse } from '../types';
+import { z } from 'zod';
 
-const responseSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    is_definitive: {
-      type: SchemaType.BOOLEAN,
-      description: "Whether the answer provides a definitive response without uncertainty or 'I don't know' type statements"
-    },
-    reasoning: {
-      type: SchemaType.STRING,
-      description: "Explanation of why the answer is or isn't definitive"
-    }
-  },
-  required: ["is_definitive", "reasoning"]
-};
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.evaluator.model,
-  generationConfig: {
-    temperature: modelConfigs.evaluator.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
+const responseSchema = z.object({
+  is_definitive: z.boolean().describe("Whether the answer provides a definitive response without uncertainty or 'I don't know' type statements"),
+  reasoning: z.string().describe("Explanation of why the answer is or isn't definitive")
 });
 
 function getPrompt(question: string, answer: string): string {
@@ -66,17 +48,30 @@ Answer: ${JSON.stringify(answer)}`;
 export async function evaluateAnswer(question: string, answer: string, tracker?: TokenTracker): Promise<{ response: EvaluationResponse, tokens: number }> {
   try {
     const prompt = getPrompt(question, answer);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as EvaluationResponse;
-    console.log('Evaluation:', {
-      definitive: json.is_definitive,
-      reason: json.reasoning
+    const result = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: modelConfigs.evaluator.model,
+      temperature: modelConfigs.evaluator.temperature,
+      max_tokens: 1000,
+      functions: [{
+        name: 'generate',
+        parameters: responseSchema.shape
+      }],
+      function_call: { name: 'generate' }
     });
-    const tokens = usage?.totalTokenCount || 0;
+
+    const functionCall = result.choices[0].message.function_call;
+    const responseData = functionCall ? JSON.parse(functionCall.arguments) as EvaluationResponse : null;
+    if (!responseData) throw new Error('No valid response generated');
+
+    console.log('Evaluation:', {
+      definitive: responseData.is_definitive,
+      reason: responseData.reasoning
+    });
+
+    const tokens = result.usage.total_tokens;
     (tracker || new TokenTracker()).trackUsage('evaluator', tokens);
-    return { response: json, tokens };
+    return { response: responseData, tokens };
   } catch (error) {
     console.error('Error in answer evaluation:', error);
     throw error;

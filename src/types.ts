@@ -1,4 +1,9 @@
-import { SchemaType } from "@google/generative-ai";
+export enum SchemaType {
+  STRING = 'STRING',
+  BOOLEAN = 'BOOLEAN',
+  ARRAY = 'ARRAY',
+  OBJECT = 'OBJECT'
+}
 
 // Action Types
 type BaseAction = {
@@ -122,14 +127,9 @@ export type KeywordsResponse = {
 // Schema Types
 export type SchemaProperty = {
   type: SchemaType;
-  description: string;
+  description?: string;
   enum?: string[];
-  items?: {
-    type: SchemaType;
-    description?: string;
-    properties?: Record<string, SchemaProperty>;
-    required?: string[];
-  };
+  items?: SchemaProperty;
   properties?: Record<string, SchemaProperty>;
   required?: string[];
   maxItems?: number;

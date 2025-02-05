@@ -29,12 +29,12 @@ if (process.env.https_proxy) {
   }
 }
 
-export const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
+export const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
 export const JINA_API_KEY = process.env.JINA_API_KEY as string;
 export const BRAVE_API_KEY = process.env.BRAVE_API_KEY as string;
 export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina'
 
-const DEFAULT_MODEL = 'gemini-1.5-flash';
+const DEFAULT_MODEL = 'gpt-4';
 
 const defaultConfig: ModelConfig = {
   model: DEFAULT_MODEL,
@@ -68,5 +68,5 @@ export const modelConfigs: ToolConfigs = {
 
 export const STEP_SLEEP = 1000;
 
-if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not found");
+if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not found");
 if (!JINA_API_KEY) throw new Error("JINA_API_KEY not found");

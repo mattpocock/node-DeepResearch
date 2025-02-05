@@ -1,36 +1,16 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import OpenAI from 'openai';
+import { OPENAI_API_KEY, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-
 import { DedupResponse } from '../types';
+import { z } from 'zod';
 
-const responseSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    think: {
-      type: SchemaType.STRING,
-      description: "Strategic reasoning about the overall deduplication approach"
-    },
-    unique_queries: {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.STRING,
-        description: "Unique query that passed the deduplication process, must be less than 30 characters"
-      },
-      description: "Array of semantically unique queries"
-    }
-  },
-  required: ["think", "unique_queries"]
-};
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.dedup.model,
-  generationConfig: {
-    temperature: modelConfigs.dedup.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
+const responseSchema = z.object({
+  think: z.string().describe("Strategic reasoning about the overall deduplication approach"),
+  unique_queries: z.array(
+    z.string().describe("Unique query that passed the deduplication process, must be less than 30 characters")
+  ).describe("Array of semantically unique queries")
 });
 
 function getPrompt(newQueries: string[], existingQueries: string[]): string {
@@ -88,14 +68,26 @@ SetB: ${JSON.stringify(existingQueries)}`;
 export async function dedupQueries(newQueries: string[], existingQueries: string[], tracker?: TokenTracker): Promise<{ unique_queries: string[], tokens: number }> {
   try {
     const prompt = getPrompt(newQueries, existingQueries);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as DedupResponse;
-    console.log('Dedup:', json.unique_queries);
-    const tokens = usage?.totalTokenCount || 0;
+    const result = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: modelConfigs.dedup.model,
+      temperature: modelConfigs.dedup.temperature,
+      max_tokens: 1000,
+      functions: [{
+        name: 'generate',
+        parameters: responseSchema.shape
+      }],
+      function_call: { name: 'generate' }
+    });
+
+    const functionCall = result.choices[0].message.function_call;
+    const responseData = functionCall ? JSON.parse(functionCall.arguments) as DedupResponse : null;
+    if (!responseData) throw new Error('No valid response generated');
+
+    console.log('Dedup:', responseData.unique_queries);
+    const tokens = result.usage.total_tokens;
     (tracker || new TokenTracker()).trackUsage('dedup', tokens);
-    return { unique_queries: json.unique_queries, tokens };
+    return { unique_queries: responseData.unique_queries, tokens };
   } catch (error) {
     console.error('Error in deduplication analysis:', error);
     throw error;

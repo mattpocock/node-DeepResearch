@@ -1,36 +1,15 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import OpenAI from 'openai';
+import { OPENAI_API_KEY, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-
 import { ErrorAnalysisResponse } from '../types';
+import { z } from 'zod';
 
-const responseSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    recap: {
-      type: SchemaType.STRING,
-      description: "Recap of the actions taken and the steps conducted"
-    },
-    blame: {
-      type: SchemaType.STRING,
-      description: "Which action or the step was the root cause of the answer rejection"
-    },
-    improvement: {
-      type: SchemaType.STRING,
-      description: "Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe."
-    }
-  },
-  required: ["recap", "blame", "improvement"]
-};
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.errorAnalyzer.model,
-  generationConfig: {
-    temperature: modelConfigs.errorAnalyzer.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
+const responseSchema = z.object({
+  recap: z.string().describe("Recap of the actions taken and the steps conducted"),
+  blame: z.string().describe("Which action or the step was the root cause of the answer rejection"),
+  improvement: z.string().describe("Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe.")
 });
 
 function getPrompt(diaryContext: string[]): string {
@@ -124,17 +103,30 @@ ${diaryContext.join('\n')}
 export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracker): Promise<{ response: ErrorAnalysisResponse, tokens: number }> {
   try {
     const prompt = getPrompt(diaryContext);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as ErrorAnalysisResponse;
-    console.log('Error analysis:', {
-      is_valid: !json.blame,
-      reason: json.blame || 'No issues found'
+    const result = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: modelConfigs.errorAnalyzer.model,
+      temperature: modelConfigs.errorAnalyzer.temperature,
+      max_tokens: 1000,
+      functions: [{
+        name: 'generate',
+        parameters: responseSchema.shape
+      }],
+      function_call: { name: 'generate' }
     });
-    const tokens = usage?.totalTokenCount || 0;
+
+    const functionCall = result.choices[0].message.function_call;
+    const responseData = functionCall ? JSON.parse(functionCall.arguments) as ErrorAnalysisResponse : null;
+    if (!responseData) throw new Error('No valid response generated');
+    
+    console.log('Error analysis:', {
+      is_valid: !responseData.blame,
+      reason: responseData.blame || 'No issues found'
+    });
+    
+    const tokens = result.usage.total_tokens;
     (tracker || new TokenTracker()).trackUsage('error-analyzer', tokens);
-    return { response: json, tokens };
+    return { response: responseData, tokens };
   } catch (error) {
     console.error('Error in answer evaluation:', error);
     throw error;

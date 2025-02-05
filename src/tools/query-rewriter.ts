@@ -1,39 +1,18 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import OpenAI from 'openai';
+import { OPENAI_API_KEY, modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-import { SearchAction } from "../types";
+import { SearchAction, KeywordsResponse } from "../types";
+import { z } from 'zod';
 
-import { KeywordsResponse } from '../types';
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-const responseSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    think: {
-      type: SchemaType.STRING,
-      description: "Strategic reasoning about query complexity and search approach"
-    },
-    queries: {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.STRING,
-        description: "Search query, must be less than 30 characters"
-      },
-      description: "Array of search queries, orthogonal to each other",
-      minItems: 1,
-      maxItems: 3
-    }
-  },
-  required: ["think", "queries"]
-};
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.queryRewriter.model,
-  generationConfig: {
-    temperature: modelConfigs.queryRewriter.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
+const responseSchema = z.object({
+  think: z.string().describe("Strategic reasoning about query complexity and search approach"),
+  queries: z.array(
+    z.string().describe("Search query, must be less than 30 characters")
+  ).describe("Array of search queries, orthogonal to each other")
+    .min(1)
+    .max(3)
 });
 
 function getPrompt(action: SearchAction): string {
@@ -115,16 +94,27 @@ Intention: ${action.think}
 export async function rewriteQuery(action: SearchAction, tracker?: TokenTracker): Promise<{ queries: string[], tokens: number }> {
   try {
     const prompt = getPrompt(action);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as KeywordsResponse;
+    const result = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: modelConfigs.queryRewriter.model,
+      temperature: modelConfigs.queryRewriter.temperature,
+      max_tokens: 1000,
+      functions: [{
+        name: 'generate',
+        parameters: responseSchema.shape
+      }],
+      function_call: { name: 'generate' }
+    });
 
-    console.log('Query rewriter:', json.queries);
-    const tokens = usage?.totalTokenCount || 0;
+    const functionCall = result.choices[0].message.function_call;
+    const responseData = functionCall ? JSON.parse(functionCall.arguments) as KeywordsResponse : null;
+    if (!responseData) throw new Error('No valid response generated');
+
+    console.log('Query rewriter:', responseData.queries);
+    const tokens = result.usage.total_tokens;
     (tracker || new TokenTracker()).trackUsage('query-rewriter', tokens);
 
-    return { queries: json.queries, tokens };
+    return { queries: responseData.queries, tokens };
   } catch (error) {
     console.error('Error in query rewriting:', error);
     throw error;
