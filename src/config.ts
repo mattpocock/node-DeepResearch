@@ -6,6 +6,11 @@ interface ModelConfig {
   temperature: number;
 }
 
+interface LLMConfig {
+  provider: 'gemini' | 'openai';
+  baseURL?: string;
+}
+
 interface ToolConfigs {
   dedup: ModelConfig;
   evaluator: ModelConfig;
@@ -32,7 +37,14 @@ if (process.env.https_proxy) {
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
 export const JINA_API_KEY = process.env.JINA_API_KEY as string;
 export const BRAVE_API_KEY = process.env.BRAVE_API_KEY as string;
+export const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
+export const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL;
 export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina'
+
+export const llmConfig: LLMConfig = {
+  provider: 'gemini',
+  baseURL: OPENAI_BASE_URL
+};
 
 const DEFAULT_MODEL = 'gemini-1.5-flash';
 
