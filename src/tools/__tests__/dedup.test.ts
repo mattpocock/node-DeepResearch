@@ -1,5 +1,7 @@
 import { dedupQueries } from '../dedup';
 
+jest.setTimeout(10000);
+
 describe('dedupQueries', () => {
   it('should remove duplicate queries', async () => {
     const queries = ['typescript tutorial', 'typescript tutorial', 'javascript basics'];

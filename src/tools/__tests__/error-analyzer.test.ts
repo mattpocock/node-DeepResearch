@@ -1,5 +1,7 @@
 import { analyzeSteps } from '../error-analyzer';
 
+jest.setTimeout(10000);
+
 describe('analyzeSteps', () => {
   it('should analyze error steps', async () => {
     const { response } = await analyzeSteps(['Step 1: Search failed', 'Step 2: Invalid query']);

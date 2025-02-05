@@ -105,8 +105,10 @@ async function generateResponse(provider: AIProvider, prompt: string, providerTy
         }
       });
       const response = await result.response;
+      const text = response.text();
+      const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/) || text.match(/(\{[\s\S]*\})/);
       return {
-        text: response.text(),
+        text: jsonMatch ? jsonMatch[1].trim() : text,
         tokens: response.usageMetadata?.totalTokenCount || 0
       };
     }

@@ -1,6 +1,8 @@
 import { evaluateAnswer } from '../evaluator';
 import { TokenTracker } from '../../utils/token-tracker';
 
+jest.setTimeout(10000);
+
 describe('evaluateAnswer', () => {
   it('should evaluate answer definitiveness', async () => {
     const tokenTracker = new TokenTracker();
