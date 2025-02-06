@@ -7,10 +7,10 @@ import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
-import {GEMINI_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
+import {SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, SchemaProperty, ResponseSchema, AnswerAction} from "./types";
+import {StepAction, ResponseSchema, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
 import {jinaSearch} from "./tools/jinaSearch";
 
@@ -24,12 +24,12 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   const actions: string[] = [];
   const properties: Record<string, any> = {
     action: {
-      type: 'STRING',
+      type: SchemaType.STRING,
       enum: actions,
       description: "Must match exactly one action type"
     },
     think: {
-      type: 'STRING',
+      type: SchemaType.STRING,
       description: "Explain why choose this action, what's the thought process behind choosing this action"
     }
   };
@@ -37,7 +37,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowSearch) {
     actions.push("search");
     properties.searchQuery = {
-      type: 'STRING',
+      type: SchemaType.STRING,
       description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand."
     };
   }
@@ -45,20 +45,20 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowAnswer) {
     actions.push("answer");
     properties.answer = {
-      type: 'STRING',
+      type: SchemaType.STRING,
       description: "Only required when choosing 'answer' action, must be the final answer in natural language"
     };
     properties.references = {
-      type: 'ARRAY',
+      type: SchemaType.ARRAY,
       items: {
-        type: 'OBJECT',
+        type: SchemaType.OBJECT,
         properties: {
           exactQuote: {
-            type: 'STRING',
+            type: SchemaType.STRING,
             description: "Exact relevant quote from the document"
           },
           url: {
-            type: 'STRING',
+            type: SchemaType.STRING,
             description: "URL of the document; must be directly from the context"
           }
         },
@@ -71,9 +71,9 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowReflect) {
     actions.push("reflect");
     properties.questionsToAnswer = {
-      type: 'ARRAY',
+      type: SchemaType.ARRAY,
       items: {
-        type: 'STRING',
+        type: SchemaType.STRING,
         description: "each question must be a single line, concise and clear. not composite or compound, less than 20 words."
       },
       description: "List of most important questions to fill the knowledge gaps of finding the answer to the original question",
@@ -84,9 +84,9 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowRead) {
     actions.push("visit");
     properties.URLTargets = {
-      type: 'ARRAY',
+      type: SchemaType.ARRAY,
       items: {
-        type: 'STRING'
+        type: SchemaType.STRING
       },
       maxItems: 2,
       description: "Must be an array of URLs, choose up the most relevant 2 URLs to visit"

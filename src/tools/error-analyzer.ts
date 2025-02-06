@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType, ResponseSchema } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 
