@@ -87,6 +87,19 @@ export interface ReadResponse {
 export type EvaluationResponse = {
   pass: boolean;
   think: string;
+  type?: 'definitive' | 'freshness' | 'plurality';
+  freshness_analysis?: {
+    likely_outdated: boolean;
+    dates_mentioned: string[];
+    current_time: string;
+    max_age_days?: number;
+  };
+  plurality_analysis?: {
+    expects_multiple: boolean;
+    provides_multiple: boolean;
+    count_expected?: number;
+    count_provided: number;
+  };
 };
 
 export type ErrorAnalysisResponse = {
