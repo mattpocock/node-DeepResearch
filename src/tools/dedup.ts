@@ -1,8 +1,8 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { GoogleGenerativeAI, SchemaType, ResponseSchema } from '@google/generative-ai';
+import { modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 
-import { DedupResponse } from '../types';
+
 
 const responseSchema = {
   type: SchemaType.OBJECT,
@@ -22,16 +22,6 @@ const responseSchema = {
   },
   required: ["think", "unique_queries"]
 };
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.dedup.model,
-  generationConfig: {
-    temperature: modelConfigs.dedup.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
-});
 
 function getPrompt(newQueries: string[], existingQueries: string[]): string {
   return `You are an expert in semantic similarity analysis. Given a set of queries (setA) and a set of queries (setB)
@@ -88,10 +78,24 @@ SetB: ${JSON.stringify(existingQueries)}`;
 export async function dedupQueries(newQueries: string[], existingQueries: string[], tracker?: TokenTracker): Promise<{ unique_queries: string[], tokens: number }> {
   try {
     const prompt = getPrompt(newQueries, existingQueries);
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+    const model = genAI.getGenerativeModel({
+      model: modelConfigs.dedup.model,
+      generationConfig: {
+        temperature: modelConfigs.dedup.temperature,
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      }
+    });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as DedupResponse;
+    const json = JSON.parse(response.text());
+
+
+
+
+
     console.log('Dedup:', json.unique_queries);
     const tokens = usage?.totalTokenCount || 0;
     (tracker || new TokenTracker()).trackUsage('dedup', tokens);

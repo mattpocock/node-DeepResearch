@@ -1,5 +1,5 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { GoogleGenerativeAI, SchemaType, ResponseSchema } from '@google/generative-ai';
+import { modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 
 import { ErrorAnalysisResponse } from '../types';
@@ -22,16 +22,6 @@ const responseSchema = {
   },
   required: ["recap", "blame", "improvement"]
 };
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.errorAnalyzer.model,
-  generationConfig: {
-    temperature: modelConfigs.errorAnalyzer.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
-});
 
 function getPrompt(diaryContext: string[]): string {
   return `You are an expert at analyzing search and reasoning processes. Your task is to analyze the given sequence of steps and identify what went wrong in the search process.
@@ -124,10 +114,24 @@ ${diaryContext.join('\n')}
 export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracker): Promise<{ response: ErrorAnalysisResponse, tokens: number }> {
   try {
     const prompt = getPrompt(diaryContext);
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+    const model = genAI.getGenerativeModel({
+      model: modelConfigs.errorAnalyzer.model,
+      generationConfig: {
+        temperature: modelConfigs.errorAnalyzer.temperature,
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      }
+    });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as ErrorAnalysisResponse;
+    const json = JSON.parse(response.text());
+
+
+
+
+
     console.log('Error analysis:', {
       is_valid: !json.blame,
       reason: json.blame || 'No issues found'

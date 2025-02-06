@@ -1,5 +1,5 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { GoogleGenerativeAI, SchemaType, ResponseSchema } from '@google/generative-ai';
+import { modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 
 import { EvaluationResponse } from '../types';
@@ -18,16 +18,6 @@ const responseSchema = {
   },
   required: ["is_definitive", "reasoning"]
 };
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.evaluator.model,
-  generationConfig: {
-    temperature: modelConfigs.evaluator.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
-});
 
 function getPrompt(question: string, answer: string): string {
   return `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
@@ -66,10 +56,24 @@ Answer: ${JSON.stringify(answer)}`;
 export async function evaluateAnswer(question: string, answer: string, tracker?: TokenTracker): Promise<{ response: EvaluationResponse, tokens: number }> {
   try {
     const prompt = getPrompt(question, answer);
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+    const model = genAI.getGenerativeModel({
+      model: modelConfigs.evaluator.model,
+      generationConfig: {
+        temperature: modelConfigs.evaluator.temperature,
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      }
+    });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as EvaluationResponse;
+    const json = JSON.parse(response.text());
+
+
+
+
+
     console.log('Evaluation:', {
       definitive: json.is_definitive,
       reason: json.reasoning

@@ -1,4 +1,4 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import {readUrl} from "./tools/read";
 import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
@@ -22,14 +22,14 @@ async function sleep(ms: number) {
 
 function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean): ResponseSchema {
   const actions: string[] = [];
-  const properties: Record<string, SchemaProperty> = {
+  const properties: Record<string, any> = {
     action: {
-      type: SchemaType.STRING,
+      type: 'STRING',
       enum: actions,
       description: "Must match exactly one action type"
     },
     think: {
-      type: SchemaType.STRING,
+      type: 'STRING',
       description: "Explain why choose this action, what's the thought process behind choosing this action"
     }
   };
@@ -37,7 +37,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowSearch) {
     actions.push("search");
     properties.searchQuery = {
-      type: SchemaType.STRING,
+      type: 'STRING',
       description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand."
     };
   }
@@ -45,20 +45,20 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowAnswer) {
     actions.push("answer");
     properties.answer = {
-      type: SchemaType.STRING,
+      type: 'STRING',
       description: "Only required when choosing 'answer' action, must be the final answer in natural language"
     };
     properties.references = {
-      type: SchemaType.ARRAY,
+      type: 'ARRAY',
       items: {
-        type: SchemaType.OBJECT,
+        type: 'OBJECT',
         properties: {
           exactQuote: {
-            type: SchemaType.STRING,
+            type: 'STRING',
             description: "Exact relevant quote from the document"
           },
           url: {
-            type: SchemaType.STRING,
+            type: 'STRING',
             description: "URL of the document; must be directly from the context"
           }
         },
@@ -71,9 +71,9 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowReflect) {
     actions.push("reflect");
     properties.questionsToAnswer = {
-      type: SchemaType.ARRAY,
+      type: 'ARRAY',
       items: {
-        type: SchemaType.STRING,
+        type: 'STRING',
         description: "each question must be a single line, concise and clear. not composite or compound, less than 20 words."
       },
       description: "List of most important questions to fill the knowledge gaps of finding the answer to the original question",
@@ -84,9 +84,9 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowRead) {
     actions.push("visit");
     properties.URLTargets = {
-      type: SchemaType.ARRAY,
+      type: 'ARRAY',
       items: {
-        type: SchemaType.STRING
+        type: 'STRING'
       },
       maxItems: 2,
       description: "Must be an array of URLs, choose up the most relevant 2 URLs to visit"
@@ -356,6 +356,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       false
     );
 
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
     const model = genAI.getGenerativeModel({
       model: modelConfigs.agent.model,
       generationConfig: {
@@ -364,14 +365,14 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
         responseSchema: getSchema(allowReflect, allowRead, allowAnswer, allowSearch)
       }
     });
-
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
+    const json = JSON.parse(response.text());
+
     context.tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
 
-
-    thisStep = JSON.parse(response.text());
+    thisStep = json;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
     console.log(`${thisStep.action} <- [${actionsStr}]`);
@@ -699,6 +700,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       true
     );
 
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
     const model = genAI.getGenerativeModel({
       model: modelConfigs.agentBeastMode.model,
       generationConfig: {
@@ -707,14 +709,15 @@ You decided to think out of the box or cut from a completely different angle.`);
         responseSchema: getSchema(false, false, allowAnswer, false)
       }
     });
-
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
+    const json = JSON.parse(response.text());
+
     context.tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
 
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-    thisStep = JSON.parse(response.text());
+    thisStep = json;
     console.log(thisStep)
     return {result: thisStep, context};
   }
@@ -732,9 +735,6 @@ async function storeContext(prompt: string, memory: any[][], step: number) {
     console.error('Context storage failed:', error);
   }
 }
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-
 
 export async function main() {
   const question = process.argv[2] || "";
