@@ -1,3 +1,11 @@
+# Files
+tasks/
+context.json
+knowledge.json
+prompt-*.txt
+queries.json
+questions.json
+
 # Logs
 logs
 .idea
