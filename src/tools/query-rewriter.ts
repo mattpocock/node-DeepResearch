@@ -18,7 +18,7 @@ const responseSchema = z.object({
 
 
 function getPrompt(action: SearchAction): string {
-  return `You are an expert Information Retrieval Assistant. Transform user queries into precise keyword combinations with strategic reasoning and appropriate search operators.
+  return `You are an expert Information Retrieval query optimizer. Optimize user queries into precise keyword combinations with strategic reasoning and appropriate search operators.
 
 <rules>
 1. Generate search queries that directly include appropriate operators
@@ -61,7 +61,7 @@ Input Query: How to fix a leaking kitchen faucet?
 <think>
 This is a how-to query seeking practical solutions. User likely wants step-by-step guidance and visual demonstrations for DIY repair. We'll target both video tutorials and written guides.
 </think>
-Queries: [
+Output Queries: [
   "kitchen faucet leak repair",
   "faucet drip fix site:youtube.com",
   "how to repair faucet "
@@ -71,7 +71,7 @@ Input Query: What are healthy breakfast options for type 2 diabetes?
 <think>
 This is a health-specific informational query. User needs authoritative medical advice combined with practical meal suggestions. Splitting into medical guidelines and recipes will provide comprehensive coverage.
 </think>
-Queries: [
+Output Queries: [
   "what to eat for type 2 diabetes",
   "type 2 diabetes breakfast guidelines",
   "diabetic breakfast recipes"
@@ -81,7 +81,7 @@ Input Query: Latest AWS Lambda features for serverless applications
 <think>
 This is a product research query focused on recent updates. User wants current information about specific technology features, likely for implementation purposes. We'll target official docs and community insights.
 </think>
-Queries: [
+Output Queries: [
   "aws lambda features site:aws.amazon.com intitle:2025",
   "new features lambda serverless"
 ]

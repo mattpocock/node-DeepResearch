@@ -3,7 +3,7 @@ import { TokenTracker } from "../utils/token-tracker";
 import { SearchResponse } from '../types';
 import { JINA_API_KEY } from "../config";
 
-export function jinaSearch(query: string, tracker?: TokenTracker): Promise<{ response: SearchResponse, tokens: number }> {
+export function search(query: string, tracker?: TokenTracker): Promise<{ response: SearchResponse, tokens: number }> {
   return new Promise((resolve, reject) => {
     if (!query.trim()) {
       reject(new Error('Query cannot be empty'));

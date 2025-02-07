@@ -1,0 +1,59 @@
+{
+  "env": {
+    "https_proxy": "",
+    "OPENAI_BASE_URL": "",
+    "GEMINI_API_KEY": "",
+    "OPENAI_API_KEY": "",
+    "JINA_API_KEY": "",
+    "BRAVE_API_KEY": "",
+    "DEFAULT_MODEL_NAME": ""
+  },
+  "defaults": {
+    "search_provider": "jina",
+    "llm_provider": "gemini",
+    "step_sleep": 1000
+  },
+  "providers": {
+    "gemini": {
+      "createClient": "createGoogleGenerativeAI"
+    },
+    "openai": {
+      "createClient": "createOpenAI",
+      "clientConfig": {
+        "compatibility": "strict"
+      }
+    }
+  },
+  "models": {
+    "gemini": {
+      "default": {
+        "model": "gemini-2.0-flash",
+        "temperature": 0,
+        "maxTokens": 8000
+      },
+      "tools": {
+        "dedup": { "temperature": 0.1 },
+        "evaluator": {},
+        "errorAnalyzer": {},
+        "queryRewriter": { "temperature": 0.1 },
+        "agent": { "temperature": 0.7 },
+        "agentBeastMode": { "temperature": 0.7 }
+      }
+    },
+    "openai": {
+      "default": {
+        "model": "gpt-4o-mini",
+        "temperature": 0,
+        "maxTokens": 8000
+      },
+      "tools": {
+        "dedup": { "temperature": 0.1 },
+        "evaluator": {},
+        "errorAnalyzer": {},
+        "queryRewriter": { "temperature": 0.1 },
+        "agent": { "temperature": 0.7 },
+        "agentBeastMode": { "temperature": 0.7 }
+      }
+    }
+  }
+}

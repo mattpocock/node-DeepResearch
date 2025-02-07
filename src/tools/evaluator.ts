@@ -285,14 +285,13 @@ export async function evaluateAnswer(
           break;
       }
     } catch (error) {
-      console.error(`Error in ${evaluationType} evaluation:`, error);
       const errorResult = await handleGenerateObjectError<EvaluationResponse>(error);
       (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.totalTokens || 0);
-      if (!errorResult.object.pass) {
-        return { response: errorResult.object };
-      }
+      // Always return from catch block to prevent undefined result
+      return { response: errorResult.object };
     }
   }
 
+  // Only reach this point if all evaluations pass
   return { response: result!.object };
 }

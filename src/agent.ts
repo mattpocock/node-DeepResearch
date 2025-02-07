@@ -7,14 +7,14 @@ import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
 import {braveSearch} from "./tools/brave-search";
 import {rewriteQuery} from "./tools/query-rewriter";
-import {dedupQueries} from "./tools/dedup";
+import {dedupQueries} from "./tools/jina-dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
-import {jinaSearch} from "./tools/jinaSearch";
+import {search} from "./tools/jina-search";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -32,7 +32,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowSearch) {
     actions.push("search");
     properties.searchQuery = z.string().max(30)
-      .describe("Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.").optional();
+      .describe("Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Existing queries must be avoided").optional();
   }
 
   if (allowAnswer) {
@@ -75,6 +75,7 @@ function getPrompt(
   question: string,
   context?: string[],
   allQuestions?: string[],
+  allKeywords?: string[],
   allowReflect: boolean = true,
   allowAnswer: boolean = true,
   allowRead: boolean = true,
@@ -190,11 +191,18 @@ ${urlList}
   }
 
   if (allowSearch) {
+
     actionSections.push(`
 <action-search>    
-- Query external sources using a public search engine
-- Focus on solving one specific aspect of the question
-- Only give keywords search query, not full sentences
+${allKeywords?.length ? `
+- Avoid the searched queries below as they do not give any useful information, you need to think out of the box and propose queries from a completely different angle:
+<bad-queries>
+${allKeywords.join('\n')}
+</bad-queries>
+`.trim() : ''}
+- Propose some unique new queries that might help you find the answer to the question
+- Focus on solving one specific aspect of the original question
+- Only use keywords, not full sentences
 </action-search>
 `);
   }
@@ -249,7 +257,11 @@ Critical Requirements:
 - Exclude all non-JSON text, markdown, or explanations
 - Maintain strict JSON syntax`);
 
-  return sections.join('\n\n');
+  return removeExtraLineBreaks(sections.join('\n\n'));
+}
+
+const removeExtraLineBreaks = (text: string) => {
+  return text.replace(/\n{2,}/gm, '\n\n');
 }
 
 const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
@@ -314,6 +326,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       currentQuestion,
       diaryContext,
       allQuestions,
+      allKeywords,
       allowReflect,
       allowAnswer,
       allowRead,
@@ -497,7 +510,7 @@ But then you realized you have asked them before. You decided to to think out of
           switch (SEARCH_PROVIDER) {
             case 'jina':
               // use jinaSearch
-              results = {results: (await jinaSearch(query, context.tokenTracker)).response?.data || []};
+              results = {results: (await search(query, context.tokenTracker)).response?.data || []};
               break;
             case 'duck':
               results = await duckSearch(query, {safeSearch: SafeSearchType.STRICT});
@@ -640,6 +653,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       question,
       diaryContext,
       allQuestions,
+      allKeywords,
       false,
       false,
       false,
@@ -652,7 +666,7 @@ You decided to think out of the box or cut from a completely different angle.`);
 
     const model = getModel('agentBeastMode');
     let object;
-    let totalTokens = 0;
+    let totalTokens;
     try {
       const result = await generateObject({
         model,
@@ -667,10 +681,10 @@ You decided to think out of the box or cut from a completely different angle.`);
       object = result.object;
       totalTokens = result.totalTokens;
     }
-    context.tokenTracker.trackUsage('agent', totalTokens);
-
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
     thisStep = object as StepAction;
+    context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
+    context.tokenTracker.trackUsage('agent', totalTokens);
     console.log(thisStep)
     return {result: thisStep, context};
   }

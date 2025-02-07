@@ -1,50 +1,48 @@
 import dotenv from 'dotenv';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import {createOpenAI, OpenAIProviderSettings} from '@ai-sdk/openai';
+import { createOpenAI, OpenAIProviderSettings } from '@ai-sdk/openai';
+import configJson from '../config.json';
 
-export type LLMProvider = 'openai' | 'gemini';
-export type ToolName = keyof ToolConfigs;
-
-function isValidProvider(provider: string): provider is LLMProvider {
-  return provider === 'openai' || provider === 'gemini';
-}
-
-function validateModelConfig(config: ModelConfig, toolName: string): ModelConfig {
-  if (typeof config.model !== 'string' || config.model.length === 0) {
-    throw new Error(`Invalid model name for ${toolName}`);
-  }
-  if (typeof config.temperature !== 'number' || config.temperature < 0 || config.temperature > 1) {
-    throw new Error(`Invalid temperature for ${toolName}`);
-  }
-  if (typeof config.maxTokens !== 'number' || config.maxTokens <= 0) {
-    throw new Error(`Invalid maxTokens for ${toolName}`);
-  }
-  return config;
-}
-
-export interface ModelConfig {
-  model: string;
-  temperature: number;
-  maxTokens: number;
-}
-
-export interface ToolConfigs {
-  dedup: ModelConfig;
-  evaluator: ModelConfig;
-  errorAnalyzer: ModelConfig;
-  queryRewriter: ModelConfig;
-  agent: ModelConfig;
-  agentBeastMode: ModelConfig;
-}
-
-
+// Load environment variables
 dotenv.config();
 
-// Setup the proxy globally if present
-if (process.env.https_proxy) {
+// Types
+export type LLMProvider = 'openai' | 'gemini';
+export type ToolName = keyof typeof configJson.models.gemini.tools;
+
+// Type definitions for our config structure
+type EnvConfig = typeof configJson.env;
+
+interface ProviderConfigBase {
+  createClient: string;
+}
+
+interface OpenAIProviderConfig extends ProviderConfigBase {
+  clientConfig: {
+    compatibility: "strict" | "compatible";
+  };
+}
+
+interface GeminiProviderConfig extends ProviderConfigBase {}
+
+type ProviderConfig = {
+  openai: OpenAIProviderConfig;
+  gemini: GeminiProviderConfig;
+};
+
+// Environment setup
+const env: EnvConfig = { ...configJson.env };
+(Object.keys(env) as (keyof EnvConfig)[]).forEach(key => {
+  if (process.env[key]) {
+    env[key] = process.env[key] || env[key];
+  }
+});
+
+// Setup proxy if present
+if (env.https_proxy) {
   try {
-    const proxyUrl = new URL(process.env.https_proxy).toString();
+    const proxyUrl = new URL(env.https_proxy).toString();
     const dispatcher = new ProxyAgent({ uri: proxyUrl });
     setGlobalDispatcher(dispatcher);
   } catch (error) {
@@ -52,79 +50,73 @@ if (process.env.https_proxy) {
   }
 }
 
-export const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL;
-export const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
-export const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
-export const JINA_API_KEY = process.env.JINA_API_KEY as string;
-export const BRAVE_API_KEY = process.env.BRAVE_API_KEY as string;
-export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina';
+// Export environment variables
+export const OPENAI_BASE_URL = env.OPENAI_BASE_URL;
+export const GEMINI_API_KEY = env.GEMINI_API_KEY;
+export const OPENAI_API_KEY = env.OPENAI_API_KEY;
+export const JINA_API_KEY = env.JINA_API_KEY;
+export const BRAVE_API_KEY = env.BRAVE_API_KEY;
+export const SEARCH_PROVIDER = configJson.defaults.search_provider;
+export const STEP_SLEEP = configJson.defaults.step_sleep;
+
+// Determine LLM provider
 export const LLM_PROVIDER: LLMProvider = (() => {
-  const provider = process.env.LLM_PROVIDER || 'gemini';
+  const provider = process.env.LLM_PROVIDER || configJson.defaults.llm_provider;
   if (!isValidProvider(provider)) {
     throw new Error(`Invalid LLM provider: ${provider}`);
   }
   return provider;
 })();
 
-const DEFAULT_GEMINI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gemini-2.0-flash';
-const DEFAULT_OPENAI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gpt-4o-mini';
+function isValidProvider(provider: string): provider is LLMProvider {
+  return provider === 'openai' || provider === 'gemini';
+}
 
-const defaultGeminiConfig: ModelConfig = {
-  model: DEFAULT_GEMINI_MODEL,
-  temperature: 0,
-  maxTokens: 8000
-};
+interface ToolConfig {
+  model: string;
+  temperature: number;
+  maxTokens: number;
+}
 
-const defaultOpenAIConfig: ModelConfig = {
-  model: DEFAULT_OPENAI_MODEL,
-  temperature: 0,
-  maxTokens: 8000
-};
+interface ToolOverrides {
+  temperature?: number;
+  maxTokens?: number;
+}
 
-export const modelConfigs: Record<LLMProvider, ToolConfigs> = {
-  gemini: {
-    dedup: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.1 }, 'dedup'),
-    evaluator: validateModelConfig({ ...defaultGeminiConfig, temperature: 0 }, 'evaluator'),
-    errorAnalyzer: validateModelConfig({ ...defaultGeminiConfig, temperature: 0 }, 'errorAnalyzer'),
-    queryRewriter: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.1 }, 'queryRewriter'),
-    agent: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.7 }, 'agent'),
-    agentBeastMode: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.7 }, 'agentBeastMode')
-  },
-  openai: {
-    dedup: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.1 }, 'dedup'),
-    evaluator: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0 }, 'evaluator'),
-    errorAnalyzer: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0 }, 'errorAnalyzer'),
-    queryRewriter: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.1 }, 'queryRewriter'),
-    agent: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.7 }, 'agent'),
-    agentBeastMode: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.7 }, 'agentBeastMode')
-  }
-};
+// Get tool configuration
+export function getToolConfig(toolName: ToolName): ToolConfig {
+  const providerConfig = configJson.models[LLM_PROVIDER];
+  const defaultConfig = providerConfig.default;
+  const toolOverrides = providerConfig.tools[toolName] as ToolOverrides;
 
-export function getToolConfig(toolName: ToolName): ModelConfig {
-  if (!modelConfigs[LLM_PROVIDER][toolName]) {
-    throw new Error(`Invalid tool name: ${toolName}`);
-  }
-  return modelConfigs[LLM_PROVIDER][toolName];
+  return {
+    model: process.env.DEFAULT_MODEL_NAME || defaultConfig.model,
+    temperature: toolOverrides.temperature ?? defaultConfig.temperature,
+    maxTokens: toolOverrides.maxTokens ?? defaultConfig.maxTokens
+  };
 }
 
 export function getMaxTokens(toolName: ToolName): number {
   return getToolConfig(toolName).maxTokens;
 }
 
-
+// Get model instance
 export function getModel(toolName: ToolName) {
   const config = getToolConfig(toolName);
+  const providerConfig = configJson.providers[LLM_PROVIDER] as ProviderConfig[typeof LLM_PROVIDER];
 
   if (LLM_PROVIDER === 'openai') {
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY not found');
     }
+
     const opt: OpenAIProviderSettings = {
       apiKey: OPENAI_API_KEY,
-      compatibility: 'strict'
-    }
+      compatibility: (providerConfig as OpenAIProviderConfig).clientConfig.compatibility
+    };
+
     if (OPENAI_BASE_URL) {
-      opt.baseURL = OPENAI_BASE_URL
+      opt.baseURL = OPENAI_BASE_URL;
     }
 
     return createOpenAI(opt)(config.model);
@@ -133,19 +125,36 @@ export function getModel(toolName: ToolName) {
   if (!GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY not found');
   }
+
   return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model);
 }
 
-export const STEP_SLEEP = 1000;
-
+// Validate required environment variables
 if (LLM_PROVIDER === 'gemini' && !GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not found");
 if (LLM_PROVIDER === 'openai' && !OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not found");
 if (!JINA_API_KEY) throw new Error("JINA_API_KEY not found");
 
-console.log('LLM Provider:', LLM_PROVIDER)
-if (LLM_PROVIDER === 'openai') {
-  console.log('OPENAI_BASE_URL', OPENAI_BASE_URL)
-  console.log('Default Model', DEFAULT_OPENAI_MODEL)
-} else {
-  console.log('Default Model', DEFAULT_GEMINI_MODEL)
-}
+// Log all configurations
+const configSummary = {
+  provider: {
+    name: LLM_PROVIDER,
+    model: LLM_PROVIDER === 'openai'
+      ? configJson.models.openai.default.model
+      : configJson.models.gemini.default.model,
+    ...(LLM_PROVIDER === 'openai' && { baseUrl: OPENAI_BASE_URL })
+  },
+  search: {
+    provider: SEARCH_PROVIDER
+  },
+  tools: Object.fromEntries(
+    Object.keys(configJson.models[LLM_PROVIDER].tools).map(name => [
+      name,
+      getToolConfig(name as ToolName)
+    ])
+  ),
+  defaults: {
+    stepSleep: STEP_SLEEP
+  }
+};
+
+console.log('Configuration Summary:', JSON.stringify(configSummary, null, 2));

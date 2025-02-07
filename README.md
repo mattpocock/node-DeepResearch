@@ -224,10 +224,28 @@ flowchart TD
 
 ## Evaluation
 
-I kept the evaluation simple, LLM-as-a-judge and collect some ego questions (i.e. questions about Jina AI that I know 100% the answer) for evaluation.
+I kept the evaluation simple, LLM-as-a-judge and collect some [ego questions](./src/evals/ego-questions.json) for evaluation. These are the questions about Jina AI that I know 100% the answer but LLMs do not.
 
 I mainly look at 3 things: total steps, total tokens, and the correctness of the final answer.
 
 ```bash
 npm run eval ./src/evals/ego-questions.json
 ```
+
+Here's the table comparing plain `gemini-2.0-flash` and `gemini-2.0-flash + node-deepresearch` on the ego set.
+
+Plain `gemini-2.0-flash` can be run by setting `tokenBudget` to zero, skipping the while-loop and directly answering the question. 
+
+It should not be surprised that plain `gemini-2.0-flash` has a 0% pass rate, as I intentionally filtered out the questions that LLMs can answer.
+
+| Metric | gemini-2.0-flash | gemini-2.0-flash + node-deepresearch （#5e80ed4） |
+|--------|------------------|-------------------------------------------------|
+| Pass Rate | 0% | 60%                                             |
+| Average Steps | 1 | 5                                               |
+| Maximum Steps | 1 | 13                                              |
+| Minimum Steps | 1 | 2                                               |
+| Median Steps | 1 | 3                                               |
+| Average Tokens | 428 | 59,408                                          |
+| Median Tokens | 434 | 16,001                                          |
+| Maximum Tokens | 463 | 347,222                                         |
+| Minimum Tokens | 374 | 5,594                                           |

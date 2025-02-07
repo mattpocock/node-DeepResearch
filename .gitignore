@@ -5,6 +5,7 @@ knowledge.json
 prompt-*.txt
 queries.json
 questions.json
+eval-*.json
 
 # Logs
 logs
