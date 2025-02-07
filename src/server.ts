@@ -36,7 +36,7 @@ const apiKeyMiddleware = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-console.info('SECURE_MODE:', secureMode)
+console.log('SECURE_MODE:', secureMode)
 if (secureMode)
   app.use(apiKeyMiddleware)
 
