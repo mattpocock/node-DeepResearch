@@ -1,14 +1,12 @@
 import fs from 'fs/promises';
-import {exec} from 'child_process';
-import {promisify} from 'util';
-import {getResponse} from '../agent';
-import {generateObject} from 'ai';
-import {GEMINI_API_KEY} from '../config';
-import {z} from 'zod';
-import {AnswerAction, TrackerContext} from "../types";
-import {createGoogleGenerativeAI} from "@ai-sdk/google";
-import {TokenTracker} from "../utils/token-tracker";
-import {ActionTracker} from "../utils/action-tracker";
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { getResponse } from '../agent';
+import { generateObject } from 'ai';
+import { GEMINI_API_KEY } from '../config';
+import { z } from 'zod';
+import { AnswerAction, TrackerContext } from "../types";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 const execAsync = promisify(exec);
 
@@ -86,7 +84,7 @@ function printStats(stats: EvaluationStats): void {
 
 async function getCurrentGitCommit(): Promise<string> {
   try {
-    const {stdout} = await execAsync('git rev-parse --short HEAD');
+    const { stdout } = await execAsync('git rev-parse --short HEAD');
     return stdout.trim();
   } catch (error) {
     console.error('Error getting git commit:', error);
@@ -136,7 +134,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
 
   // Process each question
   for (let i = 0; i < questions.length; i++) {
-    const {question, answer: expectedAnswer} = questions[i];
+    const { question, answer: expectedAnswer } = questions[i];
     console.log(`\nProcessing question ${i + 1}/${questions.length}: ${question}`);
 
     try {
@@ -145,12 +143,6 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         result: response,
         context
       } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
-
-      // Get response using the streaming agent
-      // const {
-      //   result: response,
-      //   context
-      // } = await getResponseStreamingAgent(question) as { result: AnswerAction; context: TrackerContext };
 
       const actualAnswer = response.answer;
 
@@ -184,27 +176,6 @@ async function batchEvaluate(inputFile: string): Promise<void> {
     }
   }
 
-  async function getResponseStreamingAgent(query: string) {
-    const res = await fetch("http://localhost:3000/chat", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({query})
-    })
-    const text = await res.text()
-    return {
-      result: {
-        think: '',
-        action: 'answer',
-        answer: text.split("RESPONSE_START")[1].split("RESPONSE_END")[0].trim(),
-        references: []
-      },
-      context: {
-         tokenTracker: new TokenTracker(),
-         actionTracker: new ActionTracker()
-      }
-    }
-  }
-
   // Calculate and print statistics
   const stats = calculateStats(results, modelName);
   printStats(stats);
@@ -229,4 +200,4 @@ if (require.main === module) {
   batchEvaluate(inputFile).catch(console.error);
 }
 
-export {batchEvaluate};
+export { batchEvaluate };
