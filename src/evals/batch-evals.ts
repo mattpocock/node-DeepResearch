@@ -7,6 +7,8 @@ import {GEMINI_API_KEY} from '../config';
 import {z} from 'zod';
 import {AnswerAction, TrackerContext} from "../types";
 import {createGoogleGenerativeAI} from "@ai-sdk/google";
+import {TokenTracker} from "../utils/token-tracker";
+import {ActionTracker} from "../utils/action-tracker";
 
 const execAsync = promisify(exec);
 
@@ -143,6 +145,13 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         result: response,
         context
       } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
+
+      // Get response using the streaming agent
+      // const {
+      //   result: response,
+      //   context
+      // } = await getResponseStreamingAgent(question) as { result: AnswerAction; context: TrackerContext };
+
       const actualAnswer = response.answer;
 
       // Evaluate the response
@@ -172,6 +181,27 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         expected_answer: expectedAnswer,
         actual_answer: 'Error occurred'
       });
+    }
+  }
+
+  async function getResponseStreamingAgent(query: string) {
+    const res = await fetch("http://localhost:3000/chat", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({query})
+    })
+    const text = await res.text()
+    return {
+      result: {
+        think: '',
+        action: 'answer',
+        answer: text.split("RESPONSE_START")[1].split("RESPONSE_END")[0].trim(),
+        references: []
+      },
+      context: {
+         tokenTracker: new TokenTracker(),
+         actionTracker: new ActionTracker()
+      }
     }
   }
 
