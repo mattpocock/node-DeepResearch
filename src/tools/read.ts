@@ -1,12 +1,16 @@
 import https from 'https';
 import { TokenTracker } from "../utils/token-tracker";
-
 import { ReadResponse } from '../types';
-import {JINA_API_KEY} from "../config";
+import { JINA_API_KEY } from "../config";
 
 export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response: ReadResponse, tokens: number }> {
   return new Promise((resolve, reject) => {
-    const data = JSON.stringify({url});
+    if (!url.trim()) {
+      reject(new Error('URL cannot be empty'));
+      return;
+    }
+
+    const data = JSON.stringify({ url });
 
     const options = {
       hostname: 'r.jina.ai',
@@ -25,13 +29,33 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
 
     const req = https.request(options, (res) => {
       let responseData = '';
-      res.on('data', (chunk) => responseData += chunk);
-      res.on('end', () => {
-        const response = JSON.parse(responseData) as ReadResponse;
-        // console.log('Raw read response:', response);
 
-        if (response.code === 402) {
-          reject(new Error(response.readableMessage || 'Insufficient balance'));
+      res.on('data', (chunk) => responseData += chunk);
+
+      res.on('end', () => {
+        // Check HTTP status code first
+        if (res.statusCode && res.statusCode >= 400) {
+          try {
+            // Try to parse error message from response if available
+            const errorResponse = JSON.parse(responseData);
+            if (res.statusCode === 402) {
+              reject(new Error(errorResponse.readableMessage || 'Insufficient balance'));
+              return;
+            }
+            reject(new Error(errorResponse.readableMessage || `HTTP Error ${res.statusCode}`));
+          } catch (error: unknown) {
+            // If parsing fails, just return the status code
+            reject(new Error(`HTTP Error ${res.statusCode}`));
+          }
+          return;
+        }
+
+        // Only parse JSON for successful responses
+        let response: ReadResponse;
+        try {
+          response = JSON.parse(responseData) as ReadResponse;
+        } catch (error: unknown) {
+          reject(new Error(`Failed to parse response: ${error instanceof Error ? error.message : 'Unknown error'}`));
           return;
         }
 
@@ -45,13 +69,25 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
           url: response.data.url,
           tokens: response.data.usage?.tokens || 0
         });
+
         const tokens = response.data.usage?.tokens || 0;
-        (tracker || new TokenTracker()).trackUsage('read', tokens);
+        const tokenTracker = tracker || new TokenTracker();
+        tokenTracker.trackUsage('read', tokens);
+
         resolve({ response, tokens });
       });
     });
 
-    req.on('error', reject);
+    // Add timeout handling
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error('Request timed out'));
+    });
+
+    req.on('error', (error: Error) => {
+      reject(new Error(`Request failed: ${error.message}`));
+    });
+
     req.write(data);
     req.end();
   });

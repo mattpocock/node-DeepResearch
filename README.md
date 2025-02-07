@@ -1,6 +1,6 @@
 # DeepResearch
 
-Keep searching, reading webpages, reasoning until it finds the answer (or exceeding the token budget).
+Keep searching, reading webpages, reasoning until an answer is found (or the token budget is exceeded).
 
 ```mermaid
 ---
@@ -32,6 +32,9 @@ npm install
 ```
 
 [安装部署视频教程 on Youtube](https://youtu.be/vrpraFiPUyA)
+
+It is also available on npm but not recommended for now, as the code is still under active development.
+
 
 ## Usage
 
@@ -95,6 +98,7 @@ If you use Ollama or LMStudio, you can redirect the reasoning request to your lo
 ```bash
 export LLM_PROVIDER=openai  # yes, that's right - for local llm we still use openai client
 export OPENAI_BASE_URL=http://127.0.0.1:1234/v1  # your local llm endpoint
+export OPENAI_API_KEY=whatever  # random string would do, as we don't use it (unless your local LLM has authentication)
 export DEFAULT_MODEL_NAME=qwen2.5-7b  # your local llm model name
 ```
 
