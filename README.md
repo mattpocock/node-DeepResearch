@@ -46,7 +46,19 @@ export GEMINI_API_KEY=...  # for gemini
 # export LLM_PROVIDER=openai # for openai
 export JINA_API_KEY=jina_...  # free jina api key, get from https://jina.ai/reader
 
+# Optional: Enable secure mode for the server
+# export SECURE_MODE=true  # requires API key for all requests
+# export API_KEY=your-key  # if not set, a random UUID will be generated
+
 npm run dev $QUERY
+
+## Testing
+
+Integration tests require the following environment variables to be set:
+- GOOGLE_API_KEY: Google API key for Gemini
+- JINA_API_KEY: Jina API key
+
+Tests will be skipped if these environment variables are not available.
 ```
 
 ## Demo
@@ -130,6 +142,15 @@ Response:
   "requestId": "1234567890"
 }
 ```
+
+## Secure Mode
+
+The server supports a secure mode that requires API key authentication for all requests. To enable secure mode:
+
+1. Set the environment variable `SECURE_MODE=true`
+2. Optionally set `API_KEY=your-key` (if not set, a random UUID will be generated)
+
+When secure mode is enabled, clients must include the API key in the `x-api-key` header.
 
 ### GET /api/v1/stream/:requestId
 Connect to the Server-Sent Events stream to receive progress updates and the final answer:
