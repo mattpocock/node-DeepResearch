@@ -22,7 +22,7 @@ describe('/v1/chat/completions', () => {
     process.argv.push(`--secret=${TEST_SECRET}`);
     
     // Import server module (jest.resetModules() is called automatically before each test)
-    const { default: serverModule } = await import('../server');
+    const { default: serverModule } = await require('../app');
     app = serverModule;
   });
   
@@ -67,7 +67,7 @@ describe('/v1/chat/completions', () => {
     jest.resetModules();
     
     // Reload server module without secret
-    const { default: serverModule } = await import('../server');
+    const { default: serverModule } = await require('../app');
     app = serverModule;
     
     const response = await request(app)
