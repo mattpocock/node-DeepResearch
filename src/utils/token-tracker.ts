@@ -61,7 +61,7 @@ export class TokenTracker extends EventEmitter {
     const prompt_tokens = toolBreakdown.agent || 0;
     const completion_tokens = Object.entries(toolBreakdown)
       .filter(([tool]) => tool !== 'agent')
-      .reduce((sum, [_, tokens]) => sum + tokens, 0);
+      .reduce((sum, [, tokens]) => sum + tokens, 0);
 
     return {
       prompt_tokens,
