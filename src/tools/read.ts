@@ -79,7 +79,7 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
           // Track content length tokens using the same estimation method
           if (response.data.content) {
             const contentTokens = Math.ceil(Buffer.byteLength(response.data.content, 'utf-8') / 4);
-            tracker.trackUsage('read_content', contentTokens, TOKEN_CATEGORIES.REASONING);
+            tracker.trackUsage('read_content', contentTokens);
           }
         }
 
