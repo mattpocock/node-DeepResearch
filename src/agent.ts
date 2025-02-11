@@ -12,7 +12,7 @@ import {evaluateAnswer, evaluateQuestion} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, AnswerAction, TOKEN_CATEGORIES} from "./types";
+import {StepAction, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
@@ -366,7 +366,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     console.log(thisStep)
 
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
-    context.tokenTracker.trackUsage('agent', totalTokens, TOKEN_CATEGORIES.REASONING);
+    context.tokenTracker.trackUsage('agent', totalTokens);
 
     // reset allowAnswer to true
     allowAnswer = true;
@@ -707,7 +707,7 @@ You decided to think out of the box or cut from a completely different angle.`);
     await storeContext(prompt, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
     thisStep = object as StepAction;
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
-    context.tokenTracker.trackUsage('agent', totalTokens, TOKEN_CATEGORIES.REASONING);
+    context.tokenTracker.trackUsage('agent', totalTokens);
     console.log(thisStep)
     return {result: thisStep, context};
   }
