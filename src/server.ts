@@ -10,7 +10,6 @@ import {
   ChatCompletionResponse,
   ChatCompletionChunk,
   AnswerAction,
-  TOKEN_CATEGORIES,
   Model
 } from './types';
 import fs from 'fs/promises';
@@ -198,7 +197,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     // Estimate tokens using character count / 4 as a rough approximation
     // This will be replaced with actual Gemini tokenizer in a future update
     const estimatedTokens = Math.ceil(Buffer.byteLength(message.content, 'utf-8') / 4);
-    context.tokenTracker.trackUsage('agent', estimatedTokens, TOKEN_CATEGORIES.PROMPT);
+    context.tokenTracker.trackUsage('agent', estimatedTokens);
   }
 
   // Add this inside the chat completions endpoint, before setting up the action listener
@@ -322,11 +321,11 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       // Track tokens for the final answer using content length estimation
       const content = result.action === 'answer' ? buildMdFromAnswer(result) : result.think;
       const estimatedTokens = Math.ceil(Buffer.byteLength(content, 'utf-8') / 4);
-      context.tokenTracker.trackUsage('evaluator', estimatedTokens, TOKEN_CATEGORIES.ACCEPTED);
+      context.tokenTracker.trackUsage('evaluator', estimatedTokens);
     } else {
       // Track tokens for non-answer responses using content length estimation
       const estimatedTokens = Math.ceil(Buffer.byteLength(result.think, 'utf-8') / 4);
-      context.tokenTracker.trackUsage('evaluator', estimatedTokens, TOKEN_CATEGORIES.REJECTED);
+      context.tokenTracker.trackUsage('evaluator', estimatedTokens);
     }
 
     if (body.stream) {
@@ -407,7 +406,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     // Track error tokens using content length estimation
     const errorMessage = error?.message || 'An error occurred';
     const estimatedTokens = Math.ceil(Buffer.byteLength(errorMessage, 'utf-8') / 4);
-    context.tokenTracker.trackUsage('evaluator', estimatedTokens, TOKEN_CATEGORIES.REJECTED);
+    context.tokenTracker.trackUsage('evaluator', estimatedTokens);
 
     // Clean up event listeners
     context.actionTracker.removeAllListeners('action');
@@ -434,7 +433,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
 
       // Track error token and send error message
-      context.tokenTracker.trackUsage('evaluator', 1, TOKEN_CATEGORIES.REJECTED);
+      context.tokenTracker.trackUsage('evaluator', 1);
       const errorChunk: ChatCompletionChunk = {
         id: requestId,
         object: 'chat.completion.chunk',
