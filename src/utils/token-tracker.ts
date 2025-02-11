@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 
 import { TokenUsage, TokenCategory } from '../types';
-import asyncLocalContext from '../jina-ai/lib/async-context';
 
 export class TokenTracker extends EventEmitter {
   private usages: TokenUsage[] = [];
@@ -11,9 +10,15 @@ export class TokenTracker extends EventEmitter {
     super();
     this.budget = budget;
 
-    this.on('usage', () => {
-      asyncLocalContext.ctx.chargeAmount = this.getTotalUsage();
-    });
+    if ('asyncLocalContext' in process) {
+      const asyncLocalContext = process.asyncLocalContext as any;
+      this.on('usage', () => {
+        if (asyncLocalContext.hasContext()) {
+          asyncLocalContext.ctx.chargeAmount = this.getTotalUsage();
+        }
+      });
+      
+    }
   }
 
   trackUsage(tool: string, tokens: number, category?: TokenCategory) {

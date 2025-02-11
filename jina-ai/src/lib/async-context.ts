@@ -5,4 +5,5 @@ import { container, singleton } from 'tsyringe';
 export class AsyncLocalContext extends GlobalAsyncContext {}
 
 const instance = container.resolve(AsyncLocalContext);
+Reflect.set(process, 'asyncLocalContext', instance);
 export default instance;

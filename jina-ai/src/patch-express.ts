@@ -14,6 +14,14 @@ const logger = globalLogger.child({ service: 'BillingMiddleware' });
 
 const appName = 'DEEPRESEARCH';
 export const jinaAiBillingMiddleware = (req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/ping') {
+        res.status(200).end('pone');
+        return;
+    }
+    if (req.method !== 'POST' && req.method !== 'GET') {
+        next();
+        return;
+    }
     asyncLocalContext.run(async () => {
         const googleTraceId = req.get('x-cloud-trace-context')?.split('/')?.[0];
         const ctx = asyncLocalContext.ctx;

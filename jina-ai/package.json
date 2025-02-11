@@ -1,0 +1,38 @@
+{
+  "name": "@jina-ai/node-deepresearch",
+  "version": "1.0.0",
+  "main": "dist/app.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "npx ts-node src/agent.ts",
+    "search": "npx ts-node src/test-duck.ts",
+    "rewrite": "npx ts-node src/tools/query-rewriter.ts",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "serve": "ts-node src/server.ts",
+    "eval": "ts-node src/evals/batch-evals.ts",
+    "test": "jest --testTimeout=30000",
+    "test:watch": "jest --watch"
+  },
+  "keywords": [],
+  "author": "Jina AI",
+  "license": "Apache-2.0",
+  "description": "",
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.0",
+    "civkit": "^0.8.3-3e69606",
+    "dayjs": "^1.11.13",
+    "lodash": "^4.17.21",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.15",
+    "pino-pretty": "^13.0.0"
+  }
+}
