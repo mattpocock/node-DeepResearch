@@ -4,38 +4,17 @@ import type { Express } from 'express';
 
 // Mock OpenAI API responses
 jest.mock('@ai-sdk/openai', () => {
-  const generateObjectFn = jest.fn().mockImplementation((options) => {
-    const responseText = 'This is a test response';
-    const completionTokens = Math.ceil(Buffer.byteLength(responseText, 'utf-8') / 4);
-    const promptTokens = Math.ceil(Buffer.byteLength(options.prompt, 'utf-8') / 4);
-    const response: any = {
-      usage: {
-        prompt_tokens: promptTokens,
-        completion_tokens: completionTokens,
-        total_tokens: promptTokens + completionTokens,
-        completion_tokens_details: {
-          reasoning_tokens: Math.ceil(completionTokens * 0.25),
-          accepted_prediction_tokens: Math.ceil(completionTokens * 0.5),
-          rejected_prediction_tokens: Math.ceil(completionTokens * 0.25)
-        }
-      }
-    };
-
-    response.object = {
-      type: 'answer',
-      think: 'Thinking about the response',
-      answer: responseText,
-      references: []
-    };
-    return Promise.resolve(response);
-  });
-
   const mockModel = {
     doGenerate: jest.fn().mockImplementation((messages, options = {}) => {
-      const promptTokens = Math.ceil(Buffer.byteLength(JSON.stringify(messages), 'utf-8') / 4);
       const responseText = 'This is a test response';
+      const promptTokens = Math.ceil(Buffer.byteLength(JSON.stringify(messages), 'utf-8') / 4);
       const completionTokens = Math.ceil(Buffer.byteLength(responseText, 'utf-8') / 4);
-      const response: any = {
+      return Promise.resolve({
+        choices: [{
+          message: {
+            content: responseText
+          }
+        }],
         usage: {
           prompt_tokens: promptTokens,
           completion_tokens: completionTokens,
@@ -46,34 +25,15 @@ jest.mock('@ai-sdk/openai', () => {
             rejected_prediction_tokens: Math.ceil(completionTokens * 0.25)
           }
         }
-      };
-
-      response.object = {
-        type: 'answer',
-        think: 'Thinking about the response',
-        answer: responseText,
-        references: []
-      };
-
-      return Promise.resolve(response);
-    }),
-    generateObject: generateObjectFn
+      });
+    })
   };
   return {
     createOpenAI: jest.fn().mockImplementation(() => {
-      const model = () => ({
-        ...mockModel,
-        generateObject: generateObjectFn,
-        defaultObjectGenerationMode: 'object'
-      });
-      model.defaultObjectGenerationMode = 'object';
+      const model = () => mockModel;
       return model;
     }),
-    OpenAIChatLanguageModel: jest.fn().mockImplementation(() => ({
-      ...mockModel,
-      generateObject: generateObjectFn,
-      defaultObjectGenerationMode: 'object'
-    }))
+    OpenAIChatLanguageModel: jest.fn().mockImplementation(() => mockModel)
   };
 });
 const TEST_SECRET = 'test-secret';
