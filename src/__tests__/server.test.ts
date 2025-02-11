@@ -2,6 +2,80 @@ import request from 'supertest';
 import { EventEmitter } from 'events';
 import type { Express } from 'express';
 
+// Mock OpenAI API responses
+jest.mock('@ai-sdk/openai', () => {
+  const generateObjectFn = jest.fn().mockImplementation((options) => {
+    const responseText = 'This is a test response';
+    const completionTokens = Math.ceil(Buffer.byteLength(responseText, 'utf-8') / 4);
+    const promptTokens = Math.ceil(Buffer.byteLength(options.prompt, 'utf-8') / 4);
+    const response: any = {
+      usage: {
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: promptTokens + completionTokens,
+        completion_tokens_details: {
+          reasoning_tokens: Math.ceil(completionTokens * 0.25),
+          accepted_prediction_tokens: Math.ceil(completionTokens * 0.5),
+          rejected_prediction_tokens: Math.ceil(completionTokens * 0.25)
+        }
+      }
+    };
+
+    response.object = {
+      type: 'answer',
+      think: 'Thinking about the response',
+      answer: responseText,
+      references: []
+    };
+    return Promise.resolve(response);
+  });
+
+  const mockModel = {
+    doGenerate: jest.fn().mockImplementation((messages, options = {}) => {
+      const promptTokens = Math.ceil(Buffer.byteLength(JSON.stringify(messages), 'utf-8') / 4);
+      const responseText = 'This is a test response';
+      const completionTokens = Math.ceil(Buffer.byteLength(responseText, 'utf-8') / 4);
+      const response: any = {
+        usage: {
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: promptTokens + completionTokens,
+          completion_tokens_details: {
+            reasoning_tokens: Math.ceil(completionTokens * 0.25),
+            accepted_prediction_tokens: Math.ceil(completionTokens * 0.5),
+            rejected_prediction_tokens: Math.ceil(completionTokens * 0.25)
+          }
+        }
+      };
+
+      response.object = {
+        type: 'answer',
+        think: 'Thinking about the response',
+        answer: responseText,
+        references: []
+      };
+
+      return Promise.resolve(response);
+    }),
+    generateObject: generateObjectFn
+  };
+  return {
+    createOpenAI: jest.fn().mockImplementation(() => {
+      const model = () => ({
+        ...mockModel,
+        generateObject: generateObjectFn,
+        defaultObjectGenerationMode: 'object'
+      });
+      model.defaultObjectGenerationMode = 'object';
+      return model;
+    }),
+    OpenAIChatLanguageModel: jest.fn().mockImplementation(() => ({
+      ...mockModel,
+      generateObject: generateObjectFn,
+      defaultObjectGenerationMode: 'object'
+    }))
+  };
+});
 const TEST_SECRET = 'test-secret';
 let app: Express;
 
@@ -199,11 +273,12 @@ describe('/v1/chat/completions', () => {
             }]
           });
 
-          // Verify content chunks have content
+          // Verify content chunks have content and track estimated tokens
           chunks.slice(1).forEach(chunk => {
             const content = chunk.choices[0].delta.content;
             if (content && content.trim()) {
-              totalCompletionTokens += 1; // Count 1 token per chunk as per Vercel convention
+              // Use our character-based token estimation
+              totalCompletionTokens += Math.ceil(Buffer.byteLength(content, 'utf-8') / 4);
             }
             expect(chunk).toMatchObject({
               object: 'chat.completion.chunk',
@@ -264,7 +339,12 @@ describe('/v1/chat/completions', () => {
     expect(validResponse.body.usage).toMatchObject({
       prompt_tokens: expect.any(Number),
       completion_tokens: expect.any(Number),
-      total_tokens: expect.any(Number)
+      total_tokens: expect.any(Number),
+      completion_tokens_details: {
+        reasoning_tokens: expect.any(Number),
+        accepted_prediction_tokens: expect.any(Number),
+        rejected_prediction_tokens: expect.any(Number)
+      }
     });
 
     // Verify token counts are reasonable
@@ -313,7 +393,12 @@ describe('/v1/chat/completions', () => {
       expect(response.body.usage).toMatchObject({
         prompt_tokens: expect.any(Number),
         completion_tokens: expect.any(Number),
-        total_tokens: expect.any(Number)
+        total_tokens: expect.any(Number),
+        completion_tokens_details: {
+          reasoning_tokens: expect.any(Number),
+          accepted_prediction_tokens: expect.any(Number),
+          rejected_prediction_tokens: expect.any(Number)
+        }
       });
     });
 
@@ -363,7 +448,12 @@ describe('/v1/chat/completions', () => {
     expect(response.body.usage).toMatchObject({
       prompt_tokens: expect.any(Number),
       completion_tokens: expect.any(Number),
-      total_tokens: expect.any(Number)
+      total_tokens: expect.any(Number),
+      completion_tokens_details: {
+        reasoning_tokens: expect.any(Number),
+        accepted_prediction_tokens: expect.any(Number),
+        rejected_prediction_tokens: expect.any(Number)
+      }
     });
 
     // Verify token count matches our estimation for all messages combined
