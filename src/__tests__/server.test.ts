@@ -26,14 +26,44 @@ jest.mock('@ai-sdk/openai', () => {
           }
         }
       });
+    }),
+    generateObject: jest.fn().mockImplementation((options) => {
+      const responseText = 'This is a test response';
+      const promptTokens = Math.ceil(Buffer.byteLength(JSON.stringify(options), 'utf-8') / 4);
+      const completionTokens = Math.ceil(Buffer.byteLength(responseText, 'utf-8') / 4);
+      return Promise.resolve({
+        object: {
+          type: 'answer',
+          think: 'Thinking about the response',
+          answer: responseText,
+          references: []
+        },
+        usage: {
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: promptTokens + completionTokens,
+          completion_tokens_details: {
+            reasoning_tokens: Math.ceil(completionTokens * 0.25),
+            accepted_prediction_tokens: Math.ceil(completionTokens * 0.5),
+            rejected_prediction_tokens: Math.ceil(completionTokens * 0.25)
+          }
+        }
+      });
     })
   };
   return {
     createOpenAI: jest.fn().mockImplementation(() => {
-      const model = () => mockModel;
+      const model = () => ({
+        ...mockModel,
+        defaultObjectGenerationMode: 'object'
+      });
+      model.defaultObjectGenerationMode = 'object';
       return model;
     }),
-    OpenAIChatLanguageModel: jest.fn().mockImplementation(() => mockModel)
+    OpenAIChatLanguageModel: jest.fn().mockImplementation(() => ({
+      ...mockModel,
+      defaultObjectGenerationMode: 'object'
+    }))
   };
 });
 const TEST_SECRET = 'test-secret';
