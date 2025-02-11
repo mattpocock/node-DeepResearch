@@ -10,7 +10,6 @@ import {
   ChatCompletionResponse,
   ChatCompletionChunk,
   AnswerAction,
-  TOKEN_CATEGORIES,
   Model
 } from './types';
 import fs from 'fs/promises';
@@ -446,7 +445,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
 
       // Track error token and send error message
-      context.tokenTracker.trackUsage('evaluator', 1, TOKEN_CATEGORIES.REJECTED);
+      const estimatedTokens = Math.ceil(Buffer.byteLength(errorMessage, 'utf-8') / 4);
+      context.tokenTracker.trackUsage('evaluator', estimatedTokens);
       const errorChunk: ChatCompletionChunk = {
         id: requestId,
         object: 'chat.completion.chunk',
