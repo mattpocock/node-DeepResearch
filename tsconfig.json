@@ -12,5 +12,7 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "resolveJsonModule": true
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["jina-ai/**/*", "**/__tests__/**/*"],
 }

@@ -25,7 +25,7 @@
   "description": "",
   "dependencies": {
     "@google-cloud/firestore": "^7.11.0",
-    "civkit": "^0.8.3-3e69606",
+    "civkit": "^0.8.3-15926cb",
     "dayjs": "^1.11.13",
     "lodash": "^4.17.21",
     "reflect-metadata": "^0.2.2",

@@ -19,10 +19,10 @@ WORKDIR /app
 COPY ./src ./src
 COPY ./config.json ./
 COPY ./tsconfig.json ./tsconfig.json
+RUN npm run build
+
 COPY ./jina-ai/src ./jina-ai/src
 COPY ./jina-ai/tsconfig.json ./jina-ai/tsconfig.json
-
-RUN npm run build
 WORKDIR /app/jina-ai
 RUN npm run build
 

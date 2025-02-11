@@ -13,7 +13,7 @@ export class TokenTracker extends EventEmitter {
     if ('asyncLocalContext' in process) {
       const asyncLocalContext = process.asyncLocalContext as any;
       this.on('usage', () => {
-        if (asyncLocalContext.hasContext()) {
+        if (asyncLocalContext.available()) {
           asyncLocalContext.ctx.chargeAmount = this.getTotalUsage();
         }
       });
