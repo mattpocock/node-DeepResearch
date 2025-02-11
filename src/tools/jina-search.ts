@@ -62,8 +62,9 @@ export function search(query: string, tracker?: TokenTracker): Promise<{ respons
         const totalTokens = response.data.reduce((sum, item) => sum + (item.usage?.tokens || 0), 0);
         console.log('Total URLs:', response.data.length);
 
-        const tokenTracker = tracker || new TokenTracker();
-        tokenTracker.trackUsage('search', totalTokens);
+        if (tracker) {
+          tracker.trackUsage('search', totalTokens);
+        }
 
         resolve({ response, tokens: totalTokens });
       });

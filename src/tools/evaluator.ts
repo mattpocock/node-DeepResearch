@@ -381,7 +381,9 @@ export async function evaluateQuestion(
       maxTokens: getMaxTokens('evaluator')
     });
 
-    (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
+    if (tracker) {
+      tracker.trackUsage('evaluator', result.usage?.totalTokens || 0);
+    }
     console.log('Question Evaluation:', result.object);
 
     // Always include definitive in types
@@ -419,7 +421,9 @@ async function performEvaluation(
     maxTokens: params.maxTokens
   });
 
-  (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
+  if (tracker) {
+    tracker.trackUsage('evaluator', result.usage?.totalTokens || 0);
+  }
   console.log(`${evaluationType} Evaluation:`, result.object);
 
   return result;
@@ -523,7 +527,9 @@ export async function evaluateAnswer(
       }
     } catch (error) {
       const errorResult = await handleGenerateObjectError<EvaluationResponse>(error);
-      (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.totalTokens || 0);
+      if (tracker) {
+        tracker.trackUsage('evaluator', errorResult.totalTokens || 0);
+      }
       return {response: errorResult.object};
     }
   }

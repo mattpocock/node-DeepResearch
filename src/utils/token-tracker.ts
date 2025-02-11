@@ -20,6 +20,8 @@ export class TokenTracker extends EventEmitter {
     if (!this.budget || currentTotal + tokens <= this.budget) {
       const usage = { tool, tokens, category };
       this.usages.push(usage);
+      console.log(`[TokenTracker] Adding ${tokens} tokens from ${tool}${category ? ` (${category})` : ''}`);
+      console.log(`[TokenTracker] New total: ${this.getTotalUsage()}`);
       this.emit('usage', usage);
     }
   }
