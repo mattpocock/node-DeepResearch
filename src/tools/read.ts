@@ -74,12 +74,12 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
         
         if (tracker) {
           // Track API response tokens
-          tracker.trackUsage('read_api', apiTokens, TOKEN_CATEGORIES.PROMPT);
+          tracker.trackUsage('read_api', apiTokens, TOKEN_CATEGORIES.ACCEPTED);
           
           // Track content length tokens using the same estimation method
           if (response.data.content) {
             const contentTokens = Math.ceil(Buffer.byteLength(response.data.content, 'utf-8') / 4);
-            tracker.trackUsage('read_content', contentTokens, TOKEN_CATEGORIES.PROMPT);
+            tracker.trackUsage('read_content', contentTokens);
           }
         }
 
