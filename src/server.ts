@@ -404,11 +404,10 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       requestId
     });
 
-    // Track error as rejected tokens with Vercel token counting
+    // Track error tokens using content length estimation
     const errorMessage = error?.message || 'An error occurred';
-    // Default to 1 token for errors as per Vercel AI SDK convention
-    const errorTokens = 1;
-    context.tokenTracker.trackUsage('evaluator', errorTokens, TOKEN_CATEGORIES.REJECTED);
+    const estimatedTokens = Math.ceil(Buffer.byteLength(errorMessage, 'utf-8') / 4);
+    context.tokenTracker.trackUsage('evaluator', estimatedTokens, TOKEN_CATEGORIES.REJECTED);
 
     // Clean up event listeners
     context.actionTracker.removeAllListeners('action');
