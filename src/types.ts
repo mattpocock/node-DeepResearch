@@ -100,7 +100,7 @@ export interface ReadResponse {
 export type EvaluationResponse = {
   pass: boolean;
   think: string;
-  type?: 'definitive' | 'freshness' | 'plurality';
+  type?: 'definitive' | 'freshness' | 'plurality' | 'attribution';
   freshness_analysis?: {
     likely_outdated: boolean;
     dates_mentioned: string[];

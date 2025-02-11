@@ -7,7 +7,7 @@ export async function braveSearch(query: string): Promise<{ response: BraveSearc
   const response = await axios.get<BraveSearchResponse>('https://api.search.brave.com/res/v1/web/search', {
     params: {
       q: query,
-      count: 5,
+      count: 10,
       safesearch: 'off'
     },
     headers: {

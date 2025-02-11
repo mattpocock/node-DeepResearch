@@ -1,13 +1,14 @@
-import { z } from 'zod';
-import { generateObject } from 'ai';
-import { getModel, getMaxTokens } from "../config";
-import { TokenTracker } from "../utils/token-tracker";
-import { EvaluationResponse } from '../types';
-import { handleGenerateObjectError } from '../utils/error-handling';
+import {z} from 'zod';
+import {generateObject} from 'ai';
+import {getModel, getMaxTokens} from "../config";
+import {TokenTracker} from "../utils/token-tracker";
+import {AnswerAction, EvaluationResponse} from '../types';
+import {handleGenerateObjectError} from '../utils/error-handling';
+import {readUrl, removeAllLineBreaks} from "./read";
 
 const model = getModel('evaluator');
 
-type EvaluationType = 'definitive' | 'freshness' | 'plurality';
+type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution';
 
 const baseSchema = {
   pass: z.boolean().describe('Whether the answer passes the evaluation criteria defined by the evaluator'),
@@ -40,6 +41,73 @@ const pluralitySchema = z.object({
     count_provided: z.number().describe('Number of items provided in answer')
   })
 });
+
+const attributionSchema = z.object({
+  ...baseSchema,
+  type: z.literal('attribution'),
+  attribution_analysis: z.object({
+    sources_provided: z.boolean().describe('Whether the answer provides source references'),
+    sources_verified: z.boolean().describe('Whether the provided sources contain the claimed information'),
+    quotes_accurate: z.boolean().describe('Whether the quotes accurately represent the source content')
+  })
+});
+
+function getAttributionPrompt(question: string, answer: string, sourceContent: string): string {
+  return `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided sources.
+
+<rules>
+1. Source Verification:
+   - Check if answer claims are supported by the provided source content
+   - Verify that quotes are accurate and in proper context
+   - Ensure numerical data and statistics match the source
+   - Flag any claims that go beyond what the sources support
+
+2. Attribution Analysis:
+   - Check if answer properly references its sources
+   - Verify that important claims have clear source attribution
+   - Ensure quotes are properly marked and cited
+   - Check for any unsupported generalizations
+
+3. Accuracy Requirements:
+   - Direct quotes must match source exactly
+   - Paraphrasing must maintain original meaning
+   - Statistics and numbers must be precise
+   - Context must be preserved
+</rules>
+
+<examples>
+Question: "What are Jina AI's main products?"
+Answer: "According to Jina AI's website, their main products are DocArray and Jina Framework."
+Source Content: "Jina AI's flagship products include DocArray, Jina Framework, and JCloud, offering a complete ecosystem for neural search applications."
+Evaluation: {
+  "pass": false,
+  "think": "The answer omits JCloud which is mentioned as a main product in the source. The information provided is incomplete and potentially misleading as it fails to mention a significant product from the company's ecosystem.",
+  "attribution_analysis": {
+    "sources_provided": true,
+    "sources_verified": false,
+    "quotes_accurate": false
+  }
+}
+
+Question: "When was Python first released?"
+Answer: "Python was first released in 1991 by Guido van Rossum."
+Source Content: "Python was first released in 1991 by Guido van Rossum while working at CWI."
+Evaluation: {
+  "pass": true,
+  "think": "The answer accurately reflects the core information from the source about Python's release date and creator, though it omits the additional context about CWI which isn't essential to the question.",
+  "attribution_analysis": {
+    "sources_provided": true,
+    "sources_verified": true,
+    "quotes_accurate": true
+  }
+}
+</examples>
+
+Now evaluate this pair:
+Question: ${JSON.stringify(question)}
+Answer: ${JSON.stringify(answer)}
+Source Content: ${JSON.stringify(sourceContent)}`;
+}
 
 function getDefinitivePrompt(question: string, answer: string): string {
   return `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
@@ -332,67 +400,161 @@ export async function evaluateQuestion(
   }
 }
 
+
+// Helper function to handle common evaluation logic
+async function performEvaluation(
+  evaluationType: EvaluationType,
+  params: {
+    model: any;
+    schema: z.ZodType<any>;
+    prompt: string;
+    maxTokens: number;
+  },
+  tracker?: TokenTracker
+): Promise<GenerateObjectResult> {
+  const result = await generateObject({
+    model: params.model,
+    schema: params.schema,
+    prompt: params.prompt,
+    maxTokens: params.maxTokens
+  });
+
+  (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
+  console.log(`${evaluationType} Evaluation:`, result.object);
+
+  return result;
+}
+
+interface GenerateObjectResult {
+  object: EvaluationResponse;
+  usage?: {
+    totalTokens: number;
+  };
+}
+
+// Main evaluation function
 export async function evaluateAnswer(
   question: string,
-  answer: string,
+  action: AnswerAction,
   evaluationOrder: EvaluationType[] = ['definitive', 'freshness', 'plurality'],
   tracker?: TokenTracker
 ): Promise<{ response: EvaluationResponse }> {
-  let result;
+  let result: GenerateObjectResult;
+
+  // Only add attribution if we have valid references
+  if (action.references && action.references.length > 0) {
+    evaluationOrder = ['attribution', ...evaluationOrder];
+  }
 
   for (const evaluationType of evaluationOrder) {
     try {
       switch (evaluationType) {
-        case 'definitive':
-          result = await generateObject({
-            model,
-            schema: definitiveSchema,
-            prompt: getDefinitivePrompt(question, answer),
-            maxTokens: getMaxTokens('evaluator')
-          });
-          (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
-          console.log('Evaluation:', result.object);
-          if (!result.object.pass) {
-            return { response: result.object };
+        case 'attribution': {
+          // Safely handle references and ensure we have content
+          const urls = action.references?.map(ref => ref.url) ?? [];
+          const uniqueURLs = [...new Set(urls)];
+          const allKnowledge = await fetchSourceContent(uniqueURLs, tracker);
+
+          if (!allKnowledge.trim()) {
+            return {
+              response: {
+                pass: false,
+                think: "The answer does not provide any valid attribution references that could be verified. No accessible source content was found to validate the claims made in the answer.",
+                type: 'attribution',
+              }
+            };
           }
+
+          result = await performEvaluation(
+            'attribution',
+            {
+              model,
+              schema: attributionSchema,
+              prompt: getAttributionPrompt(question, action.answer, allKnowledge),
+              maxTokens: getMaxTokens('evaluator')
+            },
+            tracker
+          );
+          break;
+        }
+
+        case 'definitive':
+          result = await performEvaluation(
+            'definitive',
+            {
+              model,
+              schema: definitiveSchema,
+              prompt: getDefinitivePrompt(question, action.answer),
+              maxTokens: getMaxTokens('evaluator')
+            },
+            tracker
+          );
           break;
 
         case 'freshness':
-          result = await generateObject({
-            model,
-            schema: freshnessSchema,
-            prompt: getFreshnessPrompt(question, answer, new Date().toISOString()),
-            maxTokens: getMaxTokens('evaluator')
-          });
-          (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
-          console.log('Evaluation:', result.object);
-          if (!result.object.pass) {
-            return { response: result.object };
-          }
+          result = await performEvaluation(
+            'freshness',
+            {
+              model,
+              schema: freshnessSchema,
+              prompt: getFreshnessPrompt(question, action.answer, new Date().toISOString()),
+              maxTokens: getMaxTokens('evaluator')
+            },
+            tracker
+          );
           break;
 
         case 'plurality':
-          result = await generateObject({
-            model,
-            schema: pluralitySchema,
-            prompt: getPluralityPrompt(question, answer),
-            maxTokens: getMaxTokens('evaluator')
-          });
-          (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
-          console.log('Evaluation:', result.object);
-          if (!result.object.pass) {
-            return { response: result.object };
-          }
+          result = await performEvaluation(
+            'plurality',
+            {
+              model,
+              schema: pluralitySchema,
+              prompt: getPluralityPrompt(question, action.answer),
+              maxTokens: getMaxTokens('evaluator')
+            },
+            tracker
+          );
           break;
+      }
+
+      if (!result?.object.pass) {
+        return {response: result.object};
       }
     } catch (error) {
       const errorResult = await handleGenerateObjectError<EvaluationResponse>(error);
       (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.totalTokens || 0);
-      // Always return from catch block to prevent undefined result
-      return { response: errorResult.object };
+      return {response: errorResult.object};
     }
   }
 
-  // Only reach this point if all evaluations pass
-  return { response: result!.object };
+  return {response: result!.object};
+}
+
+// Helper function to fetch and combine source content
+async function fetchSourceContent(urls: string[], tracker?: TokenTracker): Promise<string> {
+  if (!urls.length) return '';
+
+  try {
+    const results = await Promise.all(
+      urls.map(async (url) => {
+        try {
+          const {response} = await readUrl(url, tracker);
+          const content = response?.data?.content || '';
+          return removeAllLineBreaks(content);
+        } catch (error) {
+          console.error('Error reading URL:', error);
+          return '';
+        }
+      })
+    );
+
+    // Filter out empty results and join with proper separation
+    return results
+      .filter(content => content.trim())
+      .join('\n\n');
+  } catch (error) {
+    console.error('Error fetching source content:', error);
+    return '';
+  }
 }

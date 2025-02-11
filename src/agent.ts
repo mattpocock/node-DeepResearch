@@ -1,7 +1,7 @@
 import {z, ZodObject} from 'zod';
 import {generateObject} from 'ai';
 import {getModel, getMaxTokens, SEARCH_PROVIDER, STEP_SLEEP} from "./config";
-import {readUrl} from "./tools/read";
+import {readUrl, removeAllLineBreaks} from "./tools/read";
 import {handleGenerateObjectError} from './utils/error-handling';
 import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
@@ -273,9 +273,7 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
-function removeAllLineBreaks(text: string) {
-  return text.replace(/(\r\n|\n|\r)/gm, " ");
-}
+
 
 function removeHTMLtags(text: string) {
   return text.replace(/<[^>]*>?/gm, '');
@@ -390,7 +388,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
         ...thisStep,
       });
 
-      const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep.answer,
+      const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep,
         evaluationMetrics[currentQuestion], context.tokenTracker);
 
       if (currentQuestion === question) {

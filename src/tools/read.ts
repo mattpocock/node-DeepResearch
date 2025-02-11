@@ -92,3 +92,7 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
     req.end();
   });
 }
+
+export function removeAllLineBreaks(text: string) {
+  return text.replace(/(\r\n|\n|\r)/gm, " ");
+}
