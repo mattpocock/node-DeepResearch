@@ -193,11 +193,12 @@ describe('/v1/chat/completions', () => {
             }]
           });
 
-          // Verify content chunks have content
+          // Verify content chunks have content and track estimated tokens
           chunks.slice(1).forEach(chunk => {
             const content = chunk.choices[0].delta.content;
             if (content && content.trim()) {
-              totalCompletionTokens += 1; // Count 1 token per chunk as per Vercel convention
+              // Use our character-based token estimation
+              totalCompletionTokens += Math.ceil(Buffer.byteLength(content, 'utf-8') / 4);
             }
             expect(chunk).toMatchObject({
               object: 'chat.completion.chunk',
@@ -274,34 +275,107 @@ describe('/v1/chat/completions', () => {
     );
   });
 
-  it('should provide token usage in Vercel AI SDK format', async () => {
+  it('should provide accurate token counts for various message lengths', async () => {
+    const shortMessage = 'test';
+    const mediumMessage = 'This is a medium length message that should have more tokens than the short message.';
+    const longMessage = 'This is a very long message that should have many more tokens. '.repeat(10);
+
+    // Test short message
+    const shortResponse = await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${TEST_SECRET}`)
+      .send({
+        model: 'test-model',
+        messages: [{ role: 'user', content: shortMessage }]
+      });
+    
+    // Test medium message
+    const mediumResponse = await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${TEST_SECRET}`)
+      .send({
+        model: 'test-model',
+        messages: [{ role: 'user', content: mediumMessage }]
+      });
+    
+    // Test long message
+    const longResponse = await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${TEST_SECRET}`)
+      .send({
+        model: 'test-model',
+        messages: [{ role: 'user', content: longMessage }]
+      });
+
+    // Verify response format
+    [shortResponse, mediumResponse, longResponse].forEach(response => {
+      expect(response.status).toBe(200);
+      expect(response.body.usage).toMatchObject({
+        prompt_tokens: expect.any(Number),
+        completion_tokens: expect.any(Number),
+        total_tokens: expect.any(Number),
+        completion_tokens_details: {
+          reasoning_tokens: expect.any(Number),
+          accepted_prediction_tokens: expect.any(Number),
+          rejected_prediction_tokens: expect.any(Number)
+        }
+      });
+    });
+
+    // Verify token counts increase with message length
+    const shortTokens = shortResponse.body.usage.prompt_tokens;
+    const mediumTokens = mediumResponse.body.usage.prompt_tokens;
+    const longTokens = longResponse.body.usage.prompt_tokens;
+
+    expect(mediumTokens).toBeGreaterThan(shortTokens);
+    expect(longTokens).toBeGreaterThan(mediumTokens);
+
+    // Verify token counts match our estimation (chars/4)
+    [
+      { content: shortMessage, tokens: shortTokens },
+      { content: mediumMessage, tokens: mediumTokens },
+      { content: longMessage, tokens: longTokens }
+    ].forEach(({ content, tokens }) => {
+      const expectedTokens = Math.ceil(Buffer.byteLength(content, 'utf-8') / 4);
+      expect(tokens).toBe(expectedTokens);
+    });
+
+    // Verify total tokens calculation
+    [shortResponse, mediumResponse, longResponse].forEach(response => {
+      expect(response.body.usage.total_tokens).toBe(
+        response.body.usage.prompt_tokens + response.body.usage.completion_tokens
+      );
+    });
+  });
+
+  it('should count tokens correctly for multiple messages', async () => {
+    const messages = [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: 'Hello!' },
+      { role: 'assistant', content: 'Hi there! How can I help you?' },
+      { role: 'user', content: 'What is the weather?' }
+    ];
+
     const response = await request(app)
       .post('/v1/chat/completions')
       .set('Authorization', `Bearer ${TEST_SECRET}`)
       .send({
         model: 'test-model',
-        messages: [{ role: 'user', content: 'test' }]
+        messages
       });
-    
-    expect(response.status).toBe(200);
-    const usage = response.body.usage;
 
-    expect(usage).toMatchObject({
+    expect(response.status).toBe(200);
+    expect(response.body.usage).toMatchObject({
       prompt_tokens: expect.any(Number),
       completion_tokens: expect.any(Number),
-      total_tokens: expect.any(Number),
-      completion_tokens_details: {
-        reasoning_tokens: expect.any(Number),
-        accepted_prediction_tokens: expect.any(Number),
-        rejected_prediction_tokens: expect.any(Number)
-      }
+      total_tokens: expect.any(Number)
     });
 
-    // Verify token counts are reasonable
-    expect(usage.prompt_tokens).toBeGreaterThan(0);
-    expect(usage.completion_tokens).toBeGreaterThan(0);
-    expect(usage.total_tokens).toBe(
-      usage.prompt_tokens + usage.completion_tokens
-    );
+    // Verify token count matches our estimation for all messages combined
+    const expectedPromptTokens = messages.reduce((total, msg) => {
+      return total + Math.ceil(Buffer.byteLength(msg.content, 'utf-8') / 4);
+    }, 0);
+
+    expect(response.body.usage.prompt_tokens).toBe(expectedPromptTokens);
   });
 });
