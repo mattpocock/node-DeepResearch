@@ -8,7 +8,12 @@ describe('evaluateAnswer', () => {
 
   beforeEach(() => {
     jest.resetModules();
-    process.env = { ...originalEnv };
+    process.env = { 
+      ...originalEnv,
+      LLM_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'test-openai-key',
+      JINA_API_KEY: 'test-jina-key'
+    };
   });
 
   afterEach(() => {
