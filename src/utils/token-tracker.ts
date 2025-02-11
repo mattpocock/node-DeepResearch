@@ -30,8 +30,6 @@ export class TokenTracker extends EventEmitter {
     if (!this.budget || currentTotal + tokens <= this.budget) {
       const usage = { tool, tokens, category };
       this.usages.push(usage);
-      console.log(`[TokenTracker] Adding ${tokens} tokens from ${tool}${category ? ` (${category})` : ''}`);
-      console.log(`[TokenTracker] New total: ${this.getTotalUsage()}`);
       this.emit('usage', usage);
     }
   }
@@ -57,16 +55,28 @@ export class TokenTracker extends EventEmitter {
       rejected_prediction_tokens: number;
     };
   } {
-    const toolBreakdown = this.getUsageBreakdown();
-    const prompt_tokens = toolBreakdown.agent || 0;
-    const completion_tokens = Object.entries(toolBreakdown)
-      .filter(([tool]) => tool !== 'agent')
-      .reduce((sum, [, tokens]) => sum + tokens, 0);
+    const categoryBreakdown = this.usages.reduce((acc, { tokens, category }) => {
+      if (category) {
+        acc[category] = (acc[category] || 0) + tokens;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    const prompt_tokens = categoryBreakdown.prompt || 0;
+    const completion_tokens =
+      (categoryBreakdown.reasoning || 0) +
+      (categoryBreakdown.accepted || 0) +
+      (categoryBreakdown.rejected || 0);
 
     return {
       prompt_tokens,
       completion_tokens,
-      total_tokens: prompt_tokens + completion_tokens
+      total_tokens: prompt_tokens + completion_tokens,
+      completion_tokens_details: {
+        reasoning_tokens: categoryBreakdown.reasoning || 0,
+        accepted_prediction_tokens: categoryBreakdown.accepted || 0,
+        rejected_prediction_tokens: categoryBreakdown.rejected || 0
+      }
     };
   }
 
