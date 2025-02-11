@@ -193,10 +193,13 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     actionTracker: new ActionTracker()
   };
 
-  // Track prompt tokens for the initial message
-  // Use Vercel's token counting convention - 1 token per message
-  const messageTokens = body.messages.length;
-  context.tokenTracker.trackUsage('agent', messageTokens, TOKEN_CATEGORIES.PROMPT);
+  // Track prompt tokens for each message using actual content length
+  for (const message of body.messages) {
+    // Estimate tokens using character count / 4 as a rough approximation
+    // This will be replaced with actual Gemini tokenizer in a future update
+    const estimatedTokens = Math.ceil(Buffer.byteLength(message.content, 'utf-8') / 4);
+    context.tokenTracker.trackUsage('agent', estimatedTokens, TOKEN_CATEGORIES.PROMPT);
+  }
 
   // Add this inside the chat completions endpoint, before setting up the action listener
   const streamingState: StreamingState = {
@@ -316,13 +319,14 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
 
     // Track tokens based on action type
     if (result.action === 'answer') {
-      // Track accepted prediction tokens for the final answer using Vercel's convention
-      const answerTokens = 1; // Default to 1 token per answer
-      context.tokenTracker.trackUsage('evaluator', answerTokens, TOKEN_CATEGORIES.ACCEPTED);
+      // Track tokens for the final answer using content length estimation
+      const content = result.action === 'answer' ? buildMdFromAnswer(result) : result.think;
+      const estimatedTokens = Math.ceil(Buffer.byteLength(content, 'utf-8') / 4);
+      context.tokenTracker.trackUsage('evaluator', estimatedTokens, TOKEN_CATEGORIES.ACCEPTED);
     } else {
-      // Track rejected prediction tokens for non-answer responses
-      const rejectedTokens = 1; // Default to 1 token per rejected response
-      context.tokenTracker.trackUsage('evaluator', rejectedTokens, TOKEN_CATEGORIES.REJECTED);
+      // Track tokens for non-answer responses using content length estimation
+      const estimatedTokens = Math.ceil(Buffer.byteLength(result.think, 'utf-8') / 4);
+      context.tokenTracker.trackUsage('evaluator', estimatedTokens, TOKEN_CATEGORIES.REJECTED);
     }
 
     if (body.stream) {
