@@ -11,6 +11,8 @@ describe('/v1/chat/completions', () => {
   beforeEach(async () => {
     // Set NODE_ENV to test to prevent server from auto-starting
     process.env.NODE_ENV = 'test';
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
+    process.env.JINA_API_KEY = 'test-jina-key';
     
     // Clean up any existing secret
     const existingSecretIndex = process.argv.findIndex(arg => arg.startsWith('--secret='));
@@ -32,11 +34,13 @@ describe('/v1/chat/completions', () => {
     emitter.removeAllListeners();
     emitter.setMaxListeners(emitter.getMaxListeners() + 1);
     
-    // Clean up test secret
+    // Clean up test secret and environment variables
     const secretIndex = process.argv.findIndex(arg => arg.startsWith('--secret='));
     if (secretIndex !== -1) {
       process.argv.splice(secretIndex, 1);
     }
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.JINA_API_KEY;
 
     // Wait for any pending promises to settle
     await new Promise(resolve => setTimeout(resolve, 500));
