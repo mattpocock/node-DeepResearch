@@ -1,6 +1,6 @@
 import https from 'https';
 import { TokenTracker } from "../utils/token-tracker";
-import { SearchResponse } from '../types';
+import { SearchResponse, TOKEN_CATEGORIES } from '../types';
 import { JINA_API_KEY } from "../config";
 
 export function search(query: string, tracker?: TokenTracker): Promise<{ response: SearchResponse, tokens: number }> {
@@ -63,7 +63,7 @@ export function search(query: string, tracker?: TokenTracker): Promise<{ respons
         console.log('Total URLs:', response.data.length);
 
         if (tracker) {
-          tracker.trackUsage('search', totalTokens);
+          tracker.trackUsage('search', totalTokens, TOKEN_CATEGORIES.PROMPT);
         }
 
         resolve({ response, tokens: totalTokens });
