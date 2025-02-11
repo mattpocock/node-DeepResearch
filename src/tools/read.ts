@@ -70,11 +70,20 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
           tokens: response.data.usage?.tokens || 0
         });
 
-        const tokens = response.data.usage?.tokens || 0;
-        const tokenTracker = tracker || new TokenTracker();
-        tokenTracker.trackUsage('read', tokens);
+        const apiTokens = response.data.usage?.tokens || 0;
+        
+        if (tracker) {
+          // Track API response tokens
+          tracker.trackUsage('read_api', apiTokens);
+          
+          // Track content length tokens using the same estimation method
+          if (response.data.content) {
+            const contentTokens = Math.ceil(Buffer.byteLength(response.data.content, 'utf-8') / 4);
+            tracker.trackUsage('read_content', contentTokens);
+          }
+        }
 
-        resolve({ response, tokens });
+        resolve({ response, tokens: apiTokens });
       });
     });
 
