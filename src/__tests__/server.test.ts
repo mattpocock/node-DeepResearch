@@ -366,11 +366,15 @@ describe('/v1/chat/completions', () => {
       }
     });
 
-    // Verify token counts are reasonable
-    expect(response.body.usage.prompt_tokens).toBeGreaterThan(0);
-    expect(response.body.usage.completion_tokens).toBeGreaterThan(0);
-    expect(response.body.usage.total_tokens).toBe(
-      response.body.usage.prompt_tokens + response.body.usage.completion_tokens
-    );
+    // Calculate expected token counts
+    const message = 'test message';
+    const responseText = 'This is a test response';
+    const expectedPromptTokens = Math.ceil(Buffer.byteLength(message, 'utf-8') / 4);
+    const expectedCompletionTokens = Math.ceil(Buffer.byteLength(responseText, 'utf-8') / 4);
+
+    // Verify exact token counts
+    expect(response.body.usage.prompt_tokens).toBe(expectedPromptTokens);
+    expect(response.body.usage.completion_tokens).toBe(expectedCompletionTokens);
+    expect(response.body.usage.total_tokens).toBe(expectedPromptTokens + expectedCompletionTokens);
   });
 });
