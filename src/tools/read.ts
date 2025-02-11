@@ -1,6 +1,6 @@
 import https from 'https';
 import { TokenTracker } from "../utils/token-tracker";
-import { ReadResponse } from '../types';
+import { ReadResponse, TOKEN_CATEGORIES } from '../types';
 import { JINA_API_KEY } from "../config";
 
 export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response: ReadResponse, tokens: number }> {
@@ -74,12 +74,12 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
         
         if (tracker) {
           // Track API response tokens
-          tracker.trackUsage('read_api', apiTokens);
+          tracker.trackUsage('read_api', apiTokens, TOKEN_CATEGORIES.PROMPT);
           
           // Track content length tokens using the same estimation method
           if (response.data.content) {
             const contentTokens = Math.ceil(Buffer.byteLength(response.data.content, 'utf-8') / 4);
-            tracker.trackUsage('read_content', contentTokens);
+            tracker.trackUsage('read_content', contentTokens, TOKEN_CATEGORIES.PROMPT);
           }
         }
 
