@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import {generateObject, LanguageModelUsage, NoObjectGeneratedError} from "ai";
-import {TokenTracker} from "./token-tracker";
-import {getModel, ToolName, getToolConfig} from "../config";
+import { generateObject, LanguageModelUsage, NoObjectGeneratedError } from 'ai';
+import { TokenTracker } from './token-tracker';
+import { getModel, ToolName, getToolConfig } from '../config';
 
 interface GenerateObjectResult<T> {
   object: T;
@@ -12,7 +12,7 @@ interface GenerateOptions<T> {
   model: ToolName;
   schema: z.ZodType<T>;
   prompt?: string;
-  system?:string;
+  system?: string;
   messages?: any;
 }
 
@@ -23,14 +23,10 @@ export class ObjectGeneratorSafe {
     this.tokenTracker = tokenTracker || new TokenTracker();
   }
 
-  async generateObject<T>(options: GenerateOptions<T>): Promise<GenerateObjectResult<T>> {
-    const {
-      model,
-      schema,
-      prompt,
-      system,
-      messages,
-    } = options;
+  async generateObject<T>(
+    options: GenerateOptions<T>,
+  ): Promise<GenerateObjectResult<T>> {
+    const { model, schema, prompt, system, messages } = options;
 
     try {
       // Primary attempt with main model
@@ -46,20 +42,21 @@ export class ObjectGeneratorSafe {
 
       this.tokenTracker.trackUsage(model, result.usage);
       return result;
-
     } catch (error) {
       // First fallback: Try manual JSON parsing of the error response
       try {
         const errorResult = await this.handleGenerateObjectError<T>(error);
         this.tokenTracker.trackUsage(model, errorResult.usage);
         return errorResult;
-
       } catch (parseError) {
         // Second fallback: Try with fallback model if provided
         const fallbackModel = getModel('fallback');
         if (NoObjectGeneratedError.isInstance(parseError)) {
           const failedOutput = (parseError as any).text;
-          console.error(`${model} failed on object generation ${failedOutput} -> manual parsing failed again -> trying fallback model`, fallbackModel);
+          console.error(
+            `${model} failed on object generation ${failedOutput} -> manual parsing failed again -> trying fallback model`,
+            fallbackModel,
+          );
           try {
             const fallbackResult = await generateObject({
               model: fallbackModel,
@@ -83,14 +80,18 @@ export class ObjectGeneratorSafe {
     }
   }
 
-  private async handleGenerateObjectError<T>(error: unknown): Promise<GenerateObjectResult<T>> {
+  private async handleGenerateObjectError<T>(
+    error: unknown,
+  ): Promise<GenerateObjectResult<T>> {
     if (NoObjectGeneratedError.isInstance(error)) {
-      console.error('Object not generated according to schema, fallback to manual JSON parsing');
+      console.error(
+        'Object not generated according to schema, fallback to manual JSON parsing',
+      );
       try {
         const partialResponse = JSON.parse((error as any).text);
         return {
           object: partialResponse as T,
-          usage: (error as any).usage
+          usage: (error as any).usage,
         };
       } catch (parseError) {
         throw error;

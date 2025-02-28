@@ -40,10 +40,9 @@ npm install
 
 It is also available on npm but not recommended for now, as the code is still under active development.
 
-
 ## Usage
 
-We use Gemini (latest `gemini-2.0-flash`) / OpenAI / [LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
+We use Gemini (latest `gemini-2.0-flash`) / OpenAI / [LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai.
 
 ```bash
 export GEMINI_API_KEY=...  # for gemini
@@ -66,13 +65,14 @@ You can also use [our official DeepSearch API](https://jina.ai/deepsearch):
 https://deepsearch.jina.ai/v1/chat/completions
 ```
 
-You can use it with any OpenAI-compatible client. 
+You can use it with any OpenAI-compatible client.
 
 For the authentication Bearer, API key, rate limit, get from https://jina.ai/deepsearch.
 
 #### Client integration guidelines
 
 If you are building a web/local/mobile client that uses `Jina DeepSearch API`, here are some design guidelines:
+
 - Our API is fully compatible with [OpenAI API schema](https://platform.openai.com/docs/api-reference/chat/create), this should greatly simplify the integration process. The model name is `jina-deepsearch-v1`.
 - Our DeepSearch API is a reasoning+search grounding LLM, so it's best for questions that require deep reasoning and search.
 - Two special tokens are introduced `<think>...</think>`. Please render them with care.
@@ -82,6 +82,7 @@ If you are building a web/local/mobile client that uses `Jina DeepSearch API`, h
 - [Download Jina AI logo here](https://jina.ai/logo-Jina-1024.zip)
 
 ## Demo
+
 > was recorded with `gemini-1.5-flash`, the latest `gemini-2.0-flash` leads to much better results!
 
 Query: `"what is the latest blog post's title from jina ai?"`
@@ -92,18 +93,18 @@ Query: `"what is the context length of readerlm-v2?"`
 2 steps; answer is correct!
 ![demo1](.github/visuals/demo3.gif)
 
-Query: `"list all employees from jina ai that u can find, as many as possible"` 
+Query: `"list all employees from jina ai that u can find, as many as possible"`
 11 steps; partially correct! but im not in the list :(
 ![demo1](.github/visuals/demo2.gif)
 
-Query: `"who will be the biggest competitor of Jina AI"` 
+Query: `"who will be the biggest competitor of Jina AI"`
 42 steps; future prediction kind, so it's arguably correct! atm Im not seeing `weaviate` as a competitor, but im open for the future "i told you so" moment.
 ![demo1](.github/visuals/demo4.gif)
 
 More examples:
 
 ```
-# example: no tool calling 
+# example: no tool calling
 npm run dev "1+1="
 npm run dev "what is the capital of France?"
 
@@ -134,7 +135,6 @@ export OPENAI_API_KEY=whatever  # random string would do, as we don't use it (un
 export DEFAULT_MODEL_NAME=qwen2.5-7b  # your local llm model name
 ```
 
-
 ## OpenAI-Compatible Server API
 
 If you have a GUI client that supports OpenAI API (e.g. [CherryStudio](https://docs.cherry-ai.com/), [Chatbox](https://github.com/Bin-Huang/chatbox)) , you can simply config it to use this server.
@@ -142,6 +142,7 @@ If you have a GUI client that supports OpenAI API (e.g. [CherryStudio](https://d
 ![demo1](.github/visuals/demo6.gif)
 
 Start the server:
+
 ```bash
 # Without authentication
 npm run serve
@@ -153,6 +154,7 @@ npm run serve --secret=your_secret_token
 The server will start on http://localhost:3000 with the following endpoint:
 
 ### POST /v1/chat/completions
+
 ```bash
 # Without authentication
 curl http://localhost:3000/v1/chat/completions \
@@ -184,6 +186,7 @@ curl http://localhost:3000/v1/chat/completions \
 ```
 
 Response format:
+
 ```json
 {
   "id": "chatcmpl-123",
@@ -191,15 +194,17 @@ Response format:
   "created": 1677652288,
   "model": "jina-deepsearch-v1",
   "system_fingerprint": "fp_44709d6fcb",
-  "choices": [{
-    "index": 0,
-    "message": {
-      "role": "assistant",
-      "content": "YOUR FINAL ANSWER"
-    },
-    "logprobs": null,
-    "finish_reason": "stop"
-  }],
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "YOUR FINAL ANSWER"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
   "usage": {
     "prompt_tokens": 9,
     "completion_tokens": 12,
@@ -209,6 +214,7 @@ Response format:
 ```
 
 For streaming responses (stream: true), the server sends chunks in this format:
+
 ```json
 {
   "id": "chatcmpl-123",
@@ -216,18 +222,21 @@ For streaming responses (stream: true), the server sends chunks in this format:
   "created": 1694268190,
   "model": "jina-deepsearch-v1",
   "system_fingerprint": "fp_44709d6fcb",
-  "choices": [{
-    "index": 0,
-    "delta": {
-      "content": "..."
-    },
-    "logprobs": null,
-    "finish_reason": null
-  }]
+  "choices": [
+    {
+      "index": 0,
+      "delta": {
+        "content": "..."
+      },
+      "logprobs": null,
+      "finish_reason": null
+    }
+  ]
 }
 ```
 
 Note: The think content in streaming responses is wrapped in XML tags:
+
 ```
 <think>
 [thinking steps...]
@@ -235,23 +244,28 @@ Note: The think content in streaming responses is wrapped in XML tags:
 [final answer]
 ```
 
-
 ## Docker Setup
 
 ### Build Docker Image
+
 To build the Docker image for the application, run the following command:
+
 ```bash
 docker build -t deepresearch:latest .
 ```
 
 ### Run Docker Container
+
 To run the Docker container, use the following command:
+
 ```bash
 docker run -p 3000:3000 --env GEMINI_API_KEY=your_gemini_api_key --env JINA_API_KEY=your_jina_api_key deepresearch:latest
 ```
 
 ### Docker Compose
+
 You can also use Docker Compose to manage multi-container applications. To start the application with Docker Compose, run:
+
 ```bash
 docker-compose up
 ```
@@ -319,18 +333,18 @@ npm run eval ./src/evals/questions.json
 
 Here's the table comparing plain `gemini-2.0-flash` and `gemini-2.0-flash + node-deepresearch` on the ego set.
 
-Plain `gemini-2.0-flash` can be run by setting `tokenBudget` to zero, skipping the while-loop and directly answering the question. 
+Plain `gemini-2.0-flash` can be run by setting `tokenBudget` to zero, skipping the while-loop and directly answering the question.
 
 It should not be surprised that plain `gemini-2.0-flash` has a 0% pass rate, as I intentionally filtered out the questions that LLMs can answer.
 
-| Metric | gemini-2.0-flash | #188f1bb |
-|--------|------------------|----------|
-| Pass Rate | 0% | 75%      |
-| Average Steps | 1 | 4        |
-| Maximum Steps | 1 | 13       |
-| Minimum Steps | 1 | 2        |
-| Median Steps | 1 | 3        |
-| Average Tokens | 428 | 68,574   |
-| Median Tokens | 434 | 31,541   |
-| Maximum Tokens | 463 | 363,655  |
-| Minimum Tokens | 374 | 7,963    |
+| Metric         | gemini-2.0-flash | #188f1bb |
+| -------------- | ---------------- | -------- |
+| Pass Rate      | 0%               | 75%      |
+| Average Steps  | 1                | 4        |
+| Maximum Steps  | 1                | 13       |
+| Minimum Steps  | 1                | 2        |
+| Median Steps   | 1                | 3        |
+| Average Tokens | 428              | 68,574   |
+| Median Tokens  | 434              | 31,541   |
+| Maximum Tokens | 463              | 363,655  |
+| Minimum Tokens | 374              | 7,963    |

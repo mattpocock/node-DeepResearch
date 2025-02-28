@@ -1,12 +1,22 @@
-import {z} from 'zod';
-import {TokenTracker} from "../utils/token-tracker";
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-
+import { z } from 'zod';
+import { TokenTracker } from '../utils/token-tracker';
+import { ObjectGeneratorSafe } from '../utils/safe-generator';
 
 const responseSchema = z.object({
-  think: z.string().describe('Strategic reasoning about the overall deduplication approach').max(500),
-  unique_queries: z.array(z.string().describe('Unique query that passed the deduplication process, must be less than 30 characters'))
-    .describe('Array of semantically unique queries').max(3)
+  think: z
+    .string()
+    .describe('Strategic reasoning about the overall deduplication approach')
+    .max(500),
+  unique_queries: z
+    .array(
+      z
+        .string()
+        .describe(
+          'Unique query that passed the deduplication process, must be less than 30 characters',
+        ),
+    )
+    .describe('Array of semantically unique queries')
+    .max(3),
 });
 
 function getPrompt(newQueries: string[], existingQueries: string[]): string {
@@ -61,13 +71,12 @@ SetA: ${JSON.stringify(newQueries)}
 SetB: ${JSON.stringify(existingQueries)}`;
 }
 
-
 const TOOL_NAME = 'dedup';
 
 export async function dedupQueries(
   newQueries: string[],
   existingQueries: string[],
-  tracker?: TokenTracker
+  tracker?: TokenTracker,
 ): Promise<{ unique_queries: string[] }> {
   try {
     const generator = new ObjectGeneratorSafe(tracker);
@@ -80,8 +89,7 @@ export async function dedupQueries(
     });
 
     console.log(TOOL_NAME, result.object.unique_queries);
-    return {unique_queries: result.object.unique_queries};
-
+    return { unique_queries: result.object.unique_queries };
   } catch (error) {
     console.error(`Error in ${TOOL_NAME}`, error);
     throw error;

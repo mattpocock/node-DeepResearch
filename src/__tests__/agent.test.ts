@@ -5,34 +5,39 @@ import { readUrl } from '../tools/read';
 
 // Mock external dependencies
 jest.mock('ai', () => ({
-  generateObject: jest.fn()
+  generateObject: jest.fn(),
 }));
 
 jest.mock('../tools/jina-search', () => ({
-  search: jest.fn()
+  search: jest.fn(),
 }));
 
 jest.mock('../tools/read', () => ({
-  readUrl: jest.fn()
+  readUrl: jest.fn(),
 }));
 
 describe('getResponse', () => {
   beforeEach(() => {
     // Mock generateObject to return a valid response
     (generateObject as jest.Mock).mockResolvedValue({
-      object: { action: 'answer', answer: 'mocked response', references: [], think: 'mocked thought' },
-      usage: { totalTokens: 100 }
+      object: {
+        action: 'answer',
+        answer: 'mocked response',
+        references: [],
+        think: 'mocked thought',
+      },
+      usage: { totalTokens: 100 },
     });
 
     // Mock search to return empty results
     (search as jest.Mock).mockResolvedValue({
-      response: { data: [] }
+      response: { data: [] },
     });
 
     // Mock readUrl to return empty content
     (readUrl as jest.Mock).mockResolvedValue({
       response: { data: { content: '', url: 'test-url' } },
-      tokens: 0
+      tokens: 0,
     });
   });
 

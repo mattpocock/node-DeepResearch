@@ -21,10 +21,10 @@ jobs:
           lfs: true
       - uses: 'google-github-actions/auth@v2'
         with:
-           credentials_json: '${{ secrets.GCLOUD_SERVICE_ACCOUNT_SECRET_JSON }}'
+          credentials_json: '${{ secrets.GCLOUD_SERVICE_ACCOUNT_SECRET_JSON }}'
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
-      - name: "Docker auth"
+      - name: 'Docker auth'
         run: |-
           gcloud auth configure-docker us-docker.pkg.dev --quiet
       - name: Set controller release version
@@ -63,4 +63,3 @@ jobs:
       - name: Deploy with Tag
         run: |
           gcloud run deploy node-deep-research --image us-docker.pkg.dev/research-df067/deepresearch/node-deep-research@${{steps.container.outputs.imageid}} --tag ${{ env.RELEASE_VERSION }} --region us-central1 --async
-      

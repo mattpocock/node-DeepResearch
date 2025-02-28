@@ -1,34 +1,41 @@
-import express, {Request, Response, RequestHandler} from 'express';
+import express, { Request, Response, RequestHandler } from 'express';
 import cors from 'cors';
-import {getResponse} from './agent';
+import { getResponse } from './agent';
 import {
   TrackerContext,
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatCompletionChunk,
   AnswerAction,
-  Model, StepAction
+  Model,
+  StepAction,
 } from './types';
-import {TokenTracker} from "./utils/token-tracker";
-import {ActionTracker} from "./utils/action-tracker";
+import { TokenTracker } from './utils/token-tracker';
+import { ActionTracker } from './utils/action-tracker';
 
 const app = express();
 
 // Get secret from command line args for optional authentication
-const secret = process.argv.find(arg => arg.startsWith('--secret='))?.split('=')[1];
-
+const secret = process.argv
+  .find((arg) => arg.startsWith('--secret='))
+  ?.split('=')[1];
 
 app.use(cors());
-app.use(express.json({
-  limit: '10mb'
-}));
+app.use(
+  express.json({
+    limit: '10mb',
+  }),
+);
 
 // Add health check endpoint for Docker container verification
 app.get('/health', (req, res) => {
-  res.json({status: 'ok'});
+  res.json({ status: 'ok' });
 });
 
-async function* streamTextNaturally(text: string, streamingState: StreamingState) {
+async function* streamTextNaturally(
+  text: string,
+  streamingState: StreamingState,
+) {
   // Split text into chunks that preserve CJK characters, URLs, and regular words
   const chunks = splitTextIntoChunks(text);
   let burstMode = false;
@@ -53,7 +60,7 @@ async function* streamTextNaturally(text: string, streamingState: StreamingState
       burstMode = false;
     }
 
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
     yield chunk;
   }
 }
@@ -114,7 +121,7 @@ function splitTextIntoChunks(text: string): string[] {
   }
 
   pushCurrentChunk();
-  return chunks.filter(chunk => chunk !== '');
+  return chunks.filter((chunk) => chunk !== '');
 }
 
 function calculateDelay(chunk: string, burstMode: boolean): number {
@@ -166,9 +173,11 @@ function calculateDelay(chunk: string, burstMode: boolean): number {
 
 function getEffectiveLength(chunk: string): number {
   // Count CJK characters as 2 units
-  const cjkCount = (chunk.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g) || []).length;
+  const cjkCount = (
+    chunk.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g) || []
+  ).length;
   const regularCount = chunk.length - cjkCount;
-  return regularCount + (cjkCount * 2);
+  return regularCount + cjkCount * 2;
 }
 
 // Helper function to emit remaining content immediately
@@ -187,12 +196,14 @@ async function emitRemainingContent(
     created,
     model: model,
     system_fingerprint: 'fp_' + requestId,
-    choices: [{
-      index: 0,
-      delta: {content},
-      logprobs: null,
-      finish_reason: null
-    }],
+    choices: [
+      {
+        index: 0,
+        delta: { content },
+        logprobs: null,
+        finish_reason: null,
+      },
+    ],
   };
   res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 }
@@ -208,33 +219,32 @@ interface StreamingState {
 
 function getTokenBudgetAndMaxAttempts(
   reasoningEffort: 'low' | 'medium' | 'high' | null = 'medium',
-  maxCompletionTokens: number | null = null
-): { tokenBudget: number, maxBadAttempts: number } {
+  maxCompletionTokens: number | null = null,
+): { tokenBudget: number; maxBadAttempts: number } {
   if (maxCompletionTokens !== null) {
     return {
       tokenBudget: maxCompletionTokens,
-      maxBadAttempts: 2 // Default to medium setting for max attempts
+      maxBadAttempts: 2, // Default to medium setting for max attempts
     };
   }
 
   switch (reasoningEffort) {
     case 'low':
-      return {tokenBudget: 100000, maxBadAttempts: 1};
+      return { tokenBudget: 100000, maxBadAttempts: 1 };
     case 'high':
-      return {tokenBudget: 1000000, maxBadAttempts: 2};
+      return { tokenBudget: 1000000, maxBadAttempts: 2 };
     case 'medium':
     default:
-      return {tokenBudget: 500000, maxBadAttempts: 2};
+      return { tokenBudget: 500000, maxBadAttempts: 2 };
   }
 }
-
 
 async function completeCurrentStreaming(
   streamingState: StreamingState,
   res: Response,
   requestId: string,
   created: number,
-  model: string
+  model: string,
 ) {
   if (streamingState.currentlyStreaming && streamingState.remainingContent) {
     // Force completion of current streaming
@@ -243,7 +253,7 @@ async function completeCurrentStreaming(
       requestId,
       created,
       model,
-      streamingState.remainingContent
+      streamingState.remainingContent,
     );
     // Reset streaming state
     streamingState.currentlyStreaming = false;
@@ -255,16 +265,18 @@ async function completeCurrentStreaming(
 // OpenAI-compatible chat completions endpoint
 // Models API endpoints
 app.get('/v1/models', (async (_req: Request, res: Response) => {
-  const models: Model[] = [{
-    id: 'jina-deepsearch-v1',
-    object: 'model',
-    created: 1686935002,
-    owned_by: 'jina-ai'
-  }];
+  const models: Model[] = [
+    {
+      id: 'jina-deepsearch-v1',
+      object: 'model',
+      created: 1686935002,
+      owned_by: 'jina-ai',
+    },
+  ];
 
   res.json({
     object: 'list',
-    data: models
+    data: models,
   });
 }) as RequestHandler);
 
@@ -276,7 +288,7 @@ app.get('/v1/models/:model', (async (req: Request, res: Response) => {
       id: 'jina-deepsearch-v1',
       object: 'model',
       created: 1686935002,
-      owned_by: 'jina-ai'
+      owned_by: 'jina-ai',
     });
   } else {
     res.status(404).json({
@@ -284,8 +296,8 @@ app.get('/v1/models/:model', (async (req: Request, res: Response) => {
         message: `Model '${modelId}' not found`,
         type: 'invalid_request_error',
         param: null,
-        code: 'model_not_found'
-      }
+        code: 'model_not_found',
+      },
     });
   }
 }) as RequestHandler);
@@ -294,9 +306,13 @@ if (secret) {
   // Check authentication only if secret is set
   app.use((req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
+    if (
+      !authHeader ||
+      !authHeader.startsWith('Bearer ') ||
+      authHeader.split(' ')[1] !== secret
+    ) {
       console.log('[chat/completions] Unauthorized request');
-      res.status(401).json({error: 'Unauthorized'});
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
@@ -304,7 +320,13 @@ if (secret) {
   });
 }
 
-async function processQueue(streamingState: StreamingState, res: Response, requestId: string, created: number, model: string) {
+async function processQueue(
+  streamingState: StreamingState,
+  res: Response,
+  requestId: string,
+  created: number,
+  model: string,
+) {
   if (streamingState.processingQueue) return;
 
   streamingState.processingQueue = true;
@@ -313,7 +335,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
     const current = streamingState.queue[0];
 
     // Clear any previous state
-    streamingState.remainingContent = '';  // Add this line
+    streamingState.remainingContent = ''; // Add this line
 
     // Reset streaming state for new content
     streamingState.currentlyStreaming = true;
@@ -323,22 +345,27 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
     try {
       // Add a check to prevent duplicate streaming
       if (streamingState.currentGenerator) {
-        streamingState.currentGenerator = null;  // Add this line
+        streamingState.currentGenerator = null; // Add this line
       }
 
-      for await (const word of streamTextNaturally(current.content, streamingState)) {
+      for await (const word of streamTextNaturally(
+        current.content,
+        streamingState,
+      )) {
         const chunk: ChatCompletionChunk = {
           id: requestId,
           object: 'chat.completion.chunk',
           created,
           model,
           system_fingerprint: 'fp_' + requestId,
-          choices: [{
-            index: 0,
-            delta: {content: word},
-            logprobs: null,
-            finish_reason: null
-          }]
+          choices: [
+            {
+              index: 0,
+              delta: { content: word },
+              logprobs: null,
+              finish_reason: null,
+            },
+          ],
         };
         res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
@@ -361,9 +388,13 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   // Check authentication only if secret is set
   if (secret) {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
+    if (
+      !authHeader ||
+      !authHeader.startsWith('Bearer ') ||
+      authHeader.split(' ')[1] !== secret
+    ) {
       console.log('[chat/completions] Unauthorized request');
-      res.status(401).json({error: 'Unauthorized'});
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
   }
@@ -374,27 +405,33 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     stream: req.body.stream,
     messageCount: req.body.messages?.length,
     hasAuth: !!req.headers.authorization,
-    requestId: Date.now().toString()
+    requestId: Date.now().toString(),
   });
 
   const body = req.body as ChatCompletionRequest;
   if (!body.messages?.length) {
-    return res.status(400).json({error: 'Messages array is required and must not be empty'});
+    return res
+      .status(400)
+      .json({ error: 'Messages array is required and must not be empty' });
   }
   const lastMessage = body.messages[body.messages.length - 1];
   if (lastMessage.role !== 'user') {
-    return res.status(400).json({error: 'Last message must be from user'});
+    return res.status(400).json({ error: 'Last message must be from user' });
   }
 
   // clean <think> from all assistant messages
-  body.messages?.filter(message => message.role === 'assistant').forEach(message => {
-    message.content = (message.content as string).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-  });
+  body.messages
+    ?.filter((message) => message.role === 'assistant')
+    .forEach((message) => {
+      message.content = (message.content as string)
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .trim();
+    });
   console.log('messages', body.messages);
 
-  let {tokenBudget, maxBadAttempts} = getTokenBudgetAndMaxAttempts(
+  let { tokenBudget, maxBadAttempts } = getTokenBudgetAndMaxAttempts(
     body.reasoning_effort,
-    body.max_completion_tokens
+    body.max_completion_tokens,
   );
 
   if (body.budget_tokens) {
@@ -408,7 +445,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   const created = Math.floor(Date.now() / 1000);
   const context: TrackerContext = {
     tokenTracker: new TokenTracker(),
-    actionTracker: new ActionTracker()
+    actionTracker: new ActionTracker(),
   };
 
   // Add this inside the chat completions endpoint, before setting up the action listener
@@ -418,14 +455,13 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     remainingContent: '',
     isEmitting: false,
     queue: [],
-    processingQueue: false
+    processingQueue: false,
   };
 
   if (body.stream) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-
 
     // Send initial chunk with opening think tag
     const initialChunk: ChatCompletionChunk = {
@@ -434,12 +470,14 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       created,
       model: body.model,
       system_fingerprint: 'fp_' + requestId,
-      choices: [{
-        index: 0,
-        delta: {role: 'assistant', content: '<think>'},
-        logprobs: null,
-        finish_reason: null
-      }]
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'assistant', content: '<think>' },
+          logprobs: null,
+          finish_reason: null,
+        },
+      ],
     };
     res.write(`data: ${JSON.stringify(initialChunk)}\n\n`);
 
@@ -449,10 +487,10 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       if (step.think) {
         // if not ends with a space, add one
         const content = step.think + ' ';
-        await new Promise<void>(resolve => {
+        await new Promise<void>((resolve) => {
           streamingState.queue.push({
             content,
-            resolve
+            resolve,
           });
           // Single call to process queue is sufficient
           processQueue(streamingState, res, requestId, created, body.model);
@@ -474,13 +512,25 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     const {
       result: finalStep,
       visitedURLs: visitedURLs,
-      readURLs: readURLs
-    } = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
+      readURLs: readURLs,
+    } = await getResponse(
+      undefined,
+      tokenBudget,
+      maxBadAttempts,
+      context,
+      body.messages,
+    );
 
     const usage = context.tokenTracker.getTotalUsageSnakeCase();
     if (body.stream) {
       // Complete any ongoing streaming before sending final answer
-      await completeCurrentStreaming(streamingState, res, requestId, created, body.model);
+      await completeCurrentStreaming(
+        streamingState,
+        res,
+        requestId,
+        created,
+        body.model,
+      );
       const finalAnswer = (finalStep as AnswerAction).mdAnswer;
       // Send closing think tag
       const closeThinkChunk: ChatCompletionChunk = {
@@ -489,12 +539,14 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         created,
         model: body.model,
         system_fingerprint: 'fp_' + requestId,
-        choices: [{
-          index: 0,
-          delta: {content: `</think>\n\n${finalAnswer}`},
-          logprobs: null,
-          finish_reason: null
-        }]
+        choices: [
+          {
+            index: 0,
+            delta: { content: `</think>\n\n${finalAnswer}` },
+            logprobs: null,
+            finish_reason: null,
+          },
+        ],
       };
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
 
@@ -505,38 +557,44 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         created,
         model: body.model,
         system_fingerprint: 'fp_' + requestId,
-        choices: [{
-          index: 0,
-          delta: {content: ''},
-          logprobs: null,
-          finish_reason: 'stop'
-        }],
+        choices: [
+          {
+            index: 0,
+            delta: { content: '' },
+            logprobs: null,
+            finish_reason: 'stop',
+          },
+        ],
         usage,
         visitedURLs,
-        readURLs
+        readURLs,
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
       res.end();
     } else {
-
       const response: ChatCompletionResponse = {
         id: requestId,
         object: 'chat.completion',
         created,
         model: body.model,
         system_fingerprint: 'fp_' + requestId,
-        choices: [{
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: finalStep.action === 'answer' ? (finalStep.mdAnswer || '') : finalStep.think
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content:
+                finalStep.action === 'answer'
+                  ? finalStep.mdAnswer || ''
+                  : finalStep.think,
+            },
+            logprobs: null,
+            finish_reason: 'stop',
           },
-          logprobs: null,
-          finish_reason: 'stop'
-        }],
+        ],
         usage,
         visitedURLs,
-        readURLs
+        readURLs,
       };
 
       // Log final response (excluding full content for brevity)
@@ -546,7 +604,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         contentLength: response.choices[0].message.content.length,
         usage: response.usage,
         visitedURLs: response.visitedURLs,
-        readURLs: response.readURLs
+        readURLs: response.readURLs,
       });
 
       res.json(response);
@@ -557,7 +615,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       message: error?.message || 'An error occurred',
       stack: error?.stack,
       type: error?.constructor?.name,
-      requestId
+      requestId,
     });
 
     // Track error as rejected tokens with Vercel token counting
@@ -578,16 +636,17 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         created,
         model: body.model,
         system_fingerprint: 'fp_' + requestId,
-        choices: [{
-          index: 0,
-          delta: {content: '</think>'},
-          logprobs: null,
-          finish_reason: null
-        }],
+        choices: [
+          {
+            index: 0,
+            delta: { content: '</think>' },
+            logprobs: null,
+            finish_reason: null,
+          },
+        ],
         usage,
       };
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
-
 
       const errorChunk: ChatCompletionChunk = {
         id: requestId,
@@ -595,13 +654,15 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         created,
         model: body.model,
         system_fingerprint: 'fp_' + requestId,
-        choices: [{
-          index: 0,
-          delta: {content: errorMessage},
-          logprobs: null,
-          finish_reason: 'stop'
-        }],
-        usage
+        choices: [
+          {
+            index: 0,
+            delta: { content: errorMessage },
+            logprobs: null,
+            finish_reason: 'stop',
+          },
+        ],
+        usage,
       };
       res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
       res.end();
@@ -613,21 +674,22 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         created,
         model: body.model,
         system_fingerprint: 'fp_' + requestId,
-        choices: [{
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: `Error: ${errorMessage}`
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: `Error: ${errorMessage}`,
+            },
+            logprobs: null,
+            finish_reason: 'stop',
           },
-          logprobs: null,
-          finish_reason: 'stop'
-        }],
+        ],
         usage,
       };
       res.json(response);
     }
   }
 }) as RequestHandler);
-
 
 export default app;

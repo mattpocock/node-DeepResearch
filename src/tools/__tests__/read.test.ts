@@ -4,7 +4,10 @@ import { TokenTracker } from '../../utils/token-tracker';
 describe('readUrl', () => {
   it.skip('should read and parse URL content (skipped due to insufficient balance)', async () => {
     const tokenTracker = new TokenTracker();
-    const { response } = await readUrl('https://www.typescriptlang.org', tokenTracker);
+    const { response } = await readUrl(
+      'https://www.typescriptlang.org',
+      tokenTracker,
+    );
     expect(response).toHaveProperty('code');
     expect(response).toHaveProperty('status');
     expect(response.data).toHaveProperty('content');

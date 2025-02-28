@@ -1,7 +1,6 @@
-import {SearchAction, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
-
+import { SearchAction, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from '../utils/safe-generator';
+import { Schemas } from '../utils/schemas';
 
 function getPrompt(query: string, think: string): string {
   return `You are an expert search query generator with deep psychological understanding. You optimize user queries by extensively analyzing potential user intents and generating comprehensive search variations.
@@ -218,7 +217,11 @@ Let me think as a user: ${think}
 
 const TOOL_NAME = 'queryRewriter';
 
-export async function rewriteQuery(action: SearchAction, trackers: TrackerContext, schemaGen: Schemas): Promise<{ queries: string[] }> {
+export async function rewriteQuery(
+  action: SearchAction,
+  trackers: TrackerContext,
+  schemaGen: Schemas,
+): Promise<{ queries: string[] }> {
   try {
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
     const allQueries = [...action.searchRequests];
@@ -235,7 +238,7 @@ export async function rewriteQuery(action: SearchAction, trackers: TrackerContex
     });
 
     const queryResults = await Promise.all(queryPromises);
-    queryResults.forEach(queries => allQueries.push(...queries));
+    queryResults.forEach((queries) => allQueries.push(...queries));
     console.log(TOOL_NAME, allQueries);
     return { queries: allQueries };
   } catch (error) {

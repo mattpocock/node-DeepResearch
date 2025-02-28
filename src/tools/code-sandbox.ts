@@ -1,7 +1,6 @@
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {CodeGenResponse, TrackerContext} from "../types";
-import {Schemas} from "../utils/schemas";
-
+import { ObjectGeneratorSafe } from '../utils/safe-generator';
+import { CodeGenResponse, TrackerContext } from '../types';
+import { Schemas } from '../utils/schemas';
 
 interface SandboxResult {
   success: boolean;
@@ -9,19 +8,26 @@ interface SandboxResult {
   error?: string;
 }
 
-
 function getPrompt(
   problem: string,
   availableVars: string,
-  previousAttempts: Array<{ code: string; error?: string }> = []
+  previousAttempts: Array<{ code: string; error?: string }> = [],
 ): string {
-  const previousAttemptsContext = previousAttempts.map((attempt, index) => `
+  const previousAttemptsContext = previousAttempts
+    .map(
+      (attempt, index) => `
 <bad-attempt-${index + 1}>
 ${attempt.code}
-${attempt.error ? `Error: ${attempt.error}
+${
+  attempt.error
+    ? `Error: ${attempt.error}
 </bad-attempt-${index + 1}>
-` : ''}
-`).join('\n');
+`
+    : ''
+}
+`,
+    )
+    .join('\n');
 
   const prompt = `You are an expert JavaScript programmer. Your task is to generate JavaScript code to solve the given problem.
 
@@ -32,9 +38,13 @@ ${availableVars}
 3. You don't have access to any third party libraries that need to be installed, so you must write complete, self-contained code.
 </rules>
 
-${previousAttempts.length > 0 ? `Previous attempts and their errors:
+${
+  previousAttempts.length > 0
+    ? `Previous attempts and their errors:
 ${previousAttemptsContext}
-` : ''}
+`
+    : ''
+}
 
 <example>
 Available variables:
@@ -52,7 +62,7 @@ Response:
 Problem to solve:
 ${problem}`;
 
-  console.log('Coding prompt', prompt)
+  console.log('Coding prompt', prompt);
 
   return prompt;
 }
@@ -79,9 +89,13 @@ export class CodeSandbox {
 
   private async generateCode(
     problem: string,
-    previousAttempts: Array<{ code: string; error?: string }> = []
+    previousAttempts: Array<{ code: string; error?: string }> = [],
   ): Promise<CodeGenResponse> {
-    const prompt = getPrompt(problem, analyzeStructure(this.context), previousAttempts);
+    const prompt = getPrompt(
+      problem,
+      analyzeStructure(this.context),
+      previousAttempts,
+    );
 
     const result = await this.generator.generateObject({
       model: 'coder',
@@ -97,11 +111,14 @@ export class CodeSandbox {
   private evaluateCode(code: string): SandboxResult {
     try {
       // Create a function that uses 'with' to evaluate in the context and return the result
-      const evalInContext = new Function('context', `
+      const evalInContext = new Function(
+        'context',
+        `
         with (context) {
           ${code}
         }
-      `);
+      `,
+      );
 
       console.log('Context:', this.context);
 
@@ -111,18 +128,20 @@ export class CodeSandbox {
       if (output === undefined) {
         return {
           success: false,
-          error: 'No value was returned, make sure to use "return" statement to return the result'
+          error:
+            'No value was returned, make sure to use "return" statement to return the result',
         };
       }
 
       return {
         success: true,
-        output
+        output,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
       };
     }
   }
@@ -136,7 +155,7 @@ export class CodeSandbox {
     for (let i = 0; i < this.maxAttempts; i++) {
       // Generate code
       const generation = await this.generateCode(problem, attempts);
-      const {code} = generation;
+      const { code } = generation;
 
       console.log(`Coding attempt ${i + 1}:`, code);
       // Evaluate the code
@@ -147,9 +166,9 @@ export class CodeSandbox {
         return {
           solution: {
             code,
-            output: result.output
+            output: result.output,
           },
-          attempts
+          attempts,
         };
       }
 
@@ -158,12 +177,14 @@ export class CodeSandbox {
       // Store the failed attempt
       attempts.push({
         code,
-        error: result.error
+        error: result.error,
       });
 
       // If we've reached max attempts, throw an error
       if (i === this.maxAttempts - 1) {
-        throw new Error(`Failed to generate working code after ${this.maxAttempts} attempts`);
+        throw new Error(
+          `Failed to generate working code after ${this.maxAttempts} attempts`,
+        );
       }
     }
 
@@ -181,9 +202,9 @@ function formatValue(value: any): string {
   if (type === 'string') {
     // Clean and truncate string value
     const cleaned = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-    return cleaned.length > 50 ?
-      `"${cleaned.slice(0, 47)}..."` :
-      `"${cleaned}"`;
+    return cleaned.length > 50
+      ? `"${cleaned.slice(0, 47)}..."`
+      : `"${cleaned}"`;
   }
 
   if (type === 'number' || type === 'boolean') {

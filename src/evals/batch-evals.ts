@@ -1,12 +1,12 @@
 import fs from 'fs/promises';
-import {exec} from 'child_process';
-import {promisify} from 'util';
-import {getResponse} from '../agent';
-import {generateObject} from 'ai';
-import {GEMINI_API_KEY} from '../config';
-import {z} from 'zod';
-import {AnswerAction, TrackerContext} from "../types";
-import {createGoogleGenerativeAI} from "@ai-sdk/google";
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { getResponse } from '../agent';
+import { generateObject } from 'ai';
+import { GEMINI_API_KEY } from '../config';
+import { z } from 'zod';
+import { AnswerAction, TrackerContext } from '../types';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 
 const execAsync = promisify(exec);
 
@@ -48,10 +48,13 @@ function calculateMedian(numbers: number[]): number {
   return sorted[middle];
 }
 
-function calculateStats(results: EvaluationResult[], modelName: string): EvaluationStats {
-  const steps = results.map(r => r.total_steps);
-  const tokens = results.map(r => r.total_tokens);
-  const passCount = results.filter(r => r.pass).length;
+function calculateStats(
+  results: EvaluationResult[],
+  modelName: string,
+): EvaluationStats {
+  const steps = results.map((r) => r.total_steps);
+  const tokens = results.map((r) => r.total_tokens);
+  const passCount = results.filter((r) => r.pass).length;
 
   return {
     model_name: modelName,
@@ -63,7 +66,7 @@ function calculateStats(results: EvaluationResult[], modelName: string): Evaluat
     avg_tokens: tokens.reduce((a, b) => a + b, 0) / tokens.length,
     median_tokens: calculateMedian(tokens),
     max_tokens: Math.max(...tokens),
-    min_tokens: Math.min(...tokens)
+    min_tokens: Math.min(...tokens),
   };
 }
 
@@ -84,7 +87,7 @@ function printStats(stats: EvaluationStats): void {
 
 async function getCurrentGitCommit(): Promise<string> {
   try {
-    const {stdout} = await execAsync('git rev-parse --short HEAD');
+    const { stdout } = await execAsync('git rev-parse --short HEAD');
     return stdout.trim();
   } catch (error) {
     console.error('Error getting git commit:', error);
@@ -92,7 +95,10 @@ async function getCurrentGitCommit(): Promise<string> {
   }
 }
 
-async function evaluateAnswer(expectedAnswer: string, actualAnswer: string): Promise<{ pass: boolean; reason: string }> {
+async function evaluateAnswer(
+  expectedAnswer: string,
+  actualAnswer: string,
+): Promise<{ pass: boolean; reason: string }> {
   const prompt = `You are a deterministic evaluator with zero temperature. Compare the following expected answer with the actual answer and determine if they convey the same information.
 
 Expected answer: ${expectedAnswer}
@@ -101,17 +107,23 @@ Actual answer: ${actualAnswer}
 Minor wording differences are acceptable as long as the core information of the expected answer is preserved in the actual answer.'`;
 
   const schema = z.object({
-    pass: z.boolean().describe('Whether the actual answer matches the expected answer'),
-    reason: z.string().describe('Detailed explanation of why the evaluation passed or failed')
+    pass: z
+      .boolean()
+      .describe('Whether the actual answer matches the expected answer'),
+    reason: z
+      .string()
+      .describe('Detailed explanation of why the evaluation passed or failed'),
   });
 
   try {
     const result = await generateObject({
-      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })('gemini-2.0-flash'),  // fix to gemini-2.0-flash for evaluation
+      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(
+        'gemini-2.0-flash',
+      ), // fix to gemini-2.0-flash for evaluation
       schema,
       prompt,
       maxTokens: 1000,
-      temperature: 0  // Setting temperature to 0 for deterministic output
+      temperature: 0, // Setting temperature to 0 for deterministic output
     });
 
     return result.object;
@@ -119,14 +131,16 @@ Minor wording differences are acceptable as long as the core information of the 
     console.error('Evaluation failed:', error);
     return {
       pass: false,
-      reason: `Evaluation error: ${error}`
+      reason: `Evaluation error: ${error}`,
     };
   }
 }
 
 async function batchEvaluate(inputFile: string): Promise<void> {
   // Read and parse input file
-  const questions: Question[] = JSON.parse(await fs.readFile(inputFile, 'utf-8'));
+  const questions: Question[] = JSON.parse(
+    await fs.readFile(inputFile, 'utf-8'),
+  );
   const results: EvaluationResult[] = [];
   const gitCommit = await getCurrentGitCommit();
   const modelName = process.env.DEFAULT_MODEL_NAME || 'unknown';
@@ -134,15 +148,17 @@ async function batchEvaluate(inputFile: string): Promise<void> {
 
   // Process each question
   for (let i = 0; i < questions.length; i++) {
-    const {question, answer: expectedAnswer} = questions[i];
-    console.log(`\nProcessing question ${i + 1}/${questions.length}: ${question}`);
+    const { question, answer: expectedAnswer } = questions[i];
+    console.log(
+      `\nProcessing question ${i + 1}/${questions.length}: ${question}`,
+    );
 
     try {
       // Get response using the agent
-      const {
-        result: response,
-        context
-      } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
+      const { result: response, context } = (await getResponse(question)) as {
+        result: AnswerAction;
+        context: TrackerContext;
+      };
 
       // Get response using the streaming agent
       // const {
@@ -163,7 +179,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         total_tokens: context.tokenTracker.getTotalUsage().totalTokens,
         question,
         expected_answer: expectedAnswer,
-        actual_answer: actualAnswer
+        actual_answer: actualAnswer,
       });
 
       console.log(`Evaluation: ${evaluation.pass ? 'PASS' : 'FAIL'}`);
@@ -177,7 +193,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         total_tokens: 0,
         question,
         expected_answer: expectedAnswer,
-        actual_answer: 'Error occurred'
+        actual_answer: 'Error occurred',
       });
     }
   }
@@ -187,10 +203,17 @@ async function batchEvaluate(inputFile: string): Promise<void> {
   printStats(stats);
 
   // Save results
-  await fs.writeFile(outputFile, JSON.stringify({
-    results,
-    statistics: stats
-  }, null, 2));
+  await fs.writeFile(
+    outputFile,
+    JSON.stringify(
+      {
+        results,
+        statistics: stats,
+      },
+      null,
+      2,
+    ),
+  );
 
   console.log(`\nEvaluation results saved to ${outputFile}`);
 }
@@ -206,4 +229,4 @@ if (require.main === module) {
   batchEvaluate(inputFile).catch(console.error);
 }
 
-export {batchEvaluate};
+export { batchEvaluate };

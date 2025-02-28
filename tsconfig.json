@@ -14,5 +14,5 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*"],
-  "exclude": ["jina-ai/**/*", "**/__tests__/**/*"],
+  "exclude": ["jina-ai/**/*", "**/__tests__/**/*"]
 }

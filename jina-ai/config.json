@@ -42,12 +42,12 @@
         "coder": { "temperature": 0.6, "maxTokens": 1000 },
         "searchGrounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
-        "evaluator": {"temperature":  0.6, "maxTokens": 300},
-        "errorAnalyzer": {"maxTokens": 500},
+        "evaluator": { "temperature": 0.6, "maxTokens": 300 },
+        "errorAnalyzer": { "maxTokens": 500 },
         "queryRewriter": { "temperature": 0.1, "maxTokens": 500 },
         "agent": { "temperature": 0.6 },
         "agentBeastMode": { "temperature": 0.6 },
-        "fallback": { "temperature": 0, "maxTokens": 4000}
+        "fallback": { "temperature": 0, "maxTokens": 4000 }
       }
     },
     "openai": {

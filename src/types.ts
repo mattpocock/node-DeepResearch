@@ -1,18 +1,18 @@
 // Action Types
-import {CoreAssistantMessage, CoreUserMessage, LanguageModelUsage} from "ai";
+import { CoreAssistantMessage, CoreUserMessage, LanguageModelUsage } from 'ai';
 
 type BaseAction = {
-  action: "search" | "answer" | "reflect" | "visit" | "coding";
+  action: 'search' | 'answer' | 'reflect' | 'visit' | 'coding';
   think: string;
 };
 
 export type SearchAction = BaseAction & {
-  action: "search";
+  action: 'search';
   searchRequests: string[];
 };
 
 export type AnswerAction = BaseAction & {
-  action: "answer";
+  action: 'answer';
   answer: string;
   references: Array<{
     exactQuote: string;
@@ -22,38 +22,48 @@ export type AnswerAction = BaseAction & {
   mdAnswer?: string;
 };
 
-
 export type KnowledgeItem = {
-  question: string,
-  answer: string,
-  references?: Array<{
-    exactQuote: string;
-    url: string;
-  }> | Array<any>;
-  type: 'qa' | 'side-info' | 'chat-history' | 'url' | 'coding',
-  updated: string,
-  sourceCode?: string,
-}
+  question: string;
+  answer: string;
+  references?:
+    | Array<{
+        exactQuote: string;
+        url: string;
+      }>
+    | Array<any>;
+  type: 'qa' | 'side-info' | 'chat-history' | 'url' | 'coding';
+  updated: string;
+  sourceCode?: string;
+};
 
 export type ReflectAction = BaseAction & {
-  action: "reflect";
+  action: 'reflect';
   questionsToAnswer: string[];
 };
 
 export type VisitAction = BaseAction & {
-  action: "visit";
+  action: 'visit';
   URLTargets: string[];
 };
 
 export type CodingAction = BaseAction & {
-  action: "coding";
+  action: 'coding';
   codingIssue: string;
 };
 
-export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction | CodingAction;
+export type StepAction =
+  | SearchAction
+  | AnswerAction
+  | ReflectAction
+  | VisitAction
+  | CodingAction;
 
-export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution' | 'completeness';
-
+export type EvaluationType =
+  | 'definitive'
+  | 'freshness'
+  | 'plurality'
+  | 'attribution'
+  | 'completeness';
 
 // Following Vercel AI SDK's token counting interface
 export interface TokenUsage {
@@ -69,7 +79,7 @@ export interface SearchResponse {
     description: string;
     url: string;
     content: string;
-    usage: { tokens: number; };
+    usage: { tokens: number };
   }> | null;
   name?: string;
   message?: string;
@@ -95,15 +105,15 @@ export interface SerperSearchResponse {
     description: string;
     descriptionSource: string;
     descriptionLink: string;
-    attributes: { [k: string]: string; };
-  },
+    attributes: { [k: string]: string };
+  };
   organic: {
     title: string;
     link: string;
     snippet: string;
     date: string;
-    siteLinks?: { title: string; link: string; }[];
-    position: number,
+    siteLinks?: { title: string; link: string }[];
+    position: number;
   }[];
   topStories?: {
     title: string;
@@ -116,7 +126,6 @@ export interface SerperSearchResponse {
   credits: number;
 }
 
-
 export interface ReadResponse {
   code: number;
   status: number;
@@ -125,13 +134,12 @@ export interface ReadResponse {
     description: string;
     url: string;
     content: string;
-    usage: { tokens: number; };
+    usage: { tokens: number };
   };
   name?: string;
   message?: string;
   readableMessage?: string;
 }
-
 
 export type EvaluationResponse = {
   pass: boolean;
@@ -146,20 +154,20 @@ export type EvaluationResponse = {
     count_provided: number;
   };
   attribution_analysis?: {
-    sources_provided: boolean,
-    sources_verified: boolean,
-    quotes_accurate: boolean,
+    sources_provided: boolean;
+    sources_verified: boolean;
+    quotes_accurate: boolean;
   };
   completeness_analysis?: {
-    aspects_expected: string,
-    aspects_provided: string,
-  }
+    aspects_expected: string;
+    aspects_provided: string;
+  };
 };
 
 export type CodeGenResponse = {
   think: string;
   code: string;
-}
+};
 
 export type ErrorAnalysisResponse = {
   recap: string;
@@ -171,7 +179,6 @@ export type ErrorAnalysisResponse = {
 export type SearchResult =
   | { title: string; url: string; description: string }
   | { title: string; link: string; snippet: string };
-
 
 // OpenAI API Types
 export interface Model {
@@ -237,11 +244,10 @@ export interface ChatCompletionChunk {
 }
 
 // Tracker Types
-import {TokenTracker} from './utils/token-tracker';
-import {ActionTracker} from './utils/action-tracker';
+import { TokenTracker } from './utils/token-tracker';
+import { ActionTracker } from './utils/action-tracker';
 
 export interface TrackerContext {
   tokenTracker: TokenTracker;
   actionTracker: ActionTracker;
 }
-

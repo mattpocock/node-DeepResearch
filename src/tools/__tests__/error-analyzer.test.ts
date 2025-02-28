@@ -14,14 +14,17 @@ describe('analyzeSteps', () => {
     process.env = originalEnv;
   });
 
-  providers.forEach(provider => {
+  providers.forEach((provider) => {
     describe(`with ${provider} provider`, () => {
       beforeEach(() => {
         process.env.LLM_PROVIDER = provider;
       });
 
       it('should analyze error steps', async () => {
-        const { response } = await analyzeSteps(['Step 1: Search failed', 'Step 2: Invalid query']);
+        const { response } = await analyzeSteps([
+          'Step 1: Search failed',
+          'Step 2: Invalid query',
+        ]);
         expect(response).toHaveProperty('recap');
         expect(response).toHaveProperty('blame');
         expect(response).toHaveProperty('improvement');

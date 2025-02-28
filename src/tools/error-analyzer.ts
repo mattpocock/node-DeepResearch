@@ -1,8 +1,6 @@
-import {ErrorAnalysisResponse, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
-
-
+import { ErrorAnalysisResponse, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from '../utils/safe-generator';
+import { Schemas } from '../utils/schemas';
 
 function getPrompt(diaryContext: string[]): string {
   return `You are an expert at analyzing search and reasoning processes. Your task is to analyze the given sequence of steps and identify what went wrong in the search process.
@@ -101,7 +99,7 @@ const TOOL_NAME = 'errorAnalyzer';
 export async function analyzeSteps(
   diaryContext: string[],
   trackers: TrackerContext,
-  schemaGen: Schemas
+  schemaGen: Schemas,
 ): Promise<ErrorAnalysisResponse> {
   try {
     const generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
@@ -118,7 +116,6 @@ export async function analyzeSteps(
     trackers?.actionTracker.trackThink(result.object.improvement);
 
     return result.object as ErrorAnalysisResponse;
-
   } catch (error) {
     console.error(`Error in ${TOOL_NAME}`, error);
     throw error;

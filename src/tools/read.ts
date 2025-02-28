@@ -1,9 +1,12 @@
 import https from 'https';
-import { TokenTracker } from "../utils/token-tracker";
+import { TokenTracker } from '../utils/token-tracker';
 import { ReadResponse } from '../types';
-import { JINA_API_KEY } from "../config";
+import { JINA_API_KEY } from '../config';
 
-export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response: ReadResponse }> {
+export function readUrl(
+  url: string,
+  tracker?: TokenTracker,
+): Promise<{ response: ReadResponse }> {
   return new Promise((resolve, reject) => {
     if (!url.trim()) {
       reject(new Error('URL cannot be empty'));
@@ -18,19 +21,19 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
       path: '/',
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${JINA_API_KEY}`,
+        Accept: 'application/json',
+        Authorization: `Bearer ${JINA_API_KEY}`,
         'Content-Type': 'application/json',
         'Content-Length': data.length,
         'X-Retain-Images': 'none',
-        'X-Engine': 'direct'
-      }
+        'X-Engine': 'direct',
+      },
     };
 
     const req = https.request(options, (res) => {
       let responseData = '';
 
-      res.on('data', (chunk) => responseData += chunk);
+      res.on('data', (chunk) => (responseData += chunk));
 
       res.on('end', () => {
         // Check HTTP status code first
@@ -39,10 +42,18 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
             // Try to parse error message from response if available
             const errorResponse = JSON.parse(responseData);
             if (res.statusCode === 402) {
-              reject(new Error(errorResponse.readableMessage || 'Insufficient balance'));
+              reject(
+                new Error(
+                  errorResponse.readableMessage || 'Insufficient balance',
+                ),
+              );
               return;
             }
-            reject(new Error(errorResponse.readableMessage || `HTTP Error ${res.statusCode}`));
+            reject(
+              new Error(
+                errorResponse.readableMessage || `HTTP Error ${res.statusCode}`,
+              ),
+            );
           } catch (error: unknown) {
             // If parsing fails, just return the status code
             reject(new Error(`HTTP Error ${res.statusCode}`));
@@ -55,7 +66,11 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
         try {
           response = JSON.parse(responseData) as ReadResponse;
         } catch (error: unknown) {
-          reject(new Error(`Failed to parse response: ${error instanceof Error ? error.message : 'Unknown error'}`));
+          reject(
+            new Error(
+              `Failed to parse response: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            ),
+          );
           return;
         }
 
@@ -67,15 +82,15 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
         console.log('Read:', {
           title: response.data.title,
           url: response.data.url,
-          tokens: response.data.usage?.tokens || 0
+          tokens: response.data.usage?.tokens || 0,
         });
 
         const tokens = response.data.usage?.tokens || 0;
         const tokenTracker = tracker || new TokenTracker();
         tokenTracker.trackUsage('read', {
-            totalTokens: tokens,
-            promptTokens: url.length,
-            completionTokens: tokens
+          totalTokens: tokens,
+          promptTokens: url.length,
+          completionTokens: tokens,
         });
 
         resolve({ response });
@@ -98,5 +113,5 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
 }
 
 export function removeAllLineBreaks(text: string) {
-  return text.replace(/(\r\n|\n|\r)/gm, " ");
+  return text.replace(/(\r\n|\n|\r)/gm, ' ');
 }

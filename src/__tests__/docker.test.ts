@@ -7,7 +7,9 @@ describe('Docker build', () => {
   jest.setTimeout(300000); // 5 minutes for build
 
   it('should build Docker image successfully', async () => {
-    const { stderr } = await execAsync('docker build -t node-deepresearch-test .');
+    const { stderr } = await execAsync(
+      'docker build -t node-deepresearch-test .',
+    );
     expect(stderr).not.toContain('error');
   });
 
@@ -15,17 +17,19 @@ describe('Docker build', () => {
     // Start container with mock API keys
     await execAsync(
       'docker run -d --name test-container -p 3001:3000 ' +
-      '-e GEMINI_API_KEY=mock_key ' +
-      '-e JINA_API_KEY=mock_key ' +
-      'node-deepresearch-test'
+        '-e GEMINI_API_KEY=mock_key ' +
+        '-e JINA_API_KEY=mock_key ' +
+        'node-deepresearch-test',
     );
 
     // Wait for container to start
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     try {
       // Check if server responds
-      const { stdout } = await execAsync('curl -s http://localhost:3001/health');
+      const { stdout } = await execAsync(
+        'curl -s http://localhost:3001/health',
+      );
       expect(stdout).toContain('ok');
     } finally {
       // Cleanup

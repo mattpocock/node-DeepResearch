@@ -15,7 +15,7 @@ describe('evaluateAnswer', () => {
     process.env = originalEnv;
   });
 
-  providers.forEach(provider => {
+  providers.forEach((provider) => {
     describe(`with ${provider} provider`, () => {
       beforeEach(() => {
         process.env.LLM_PROVIDER = provider;
@@ -26,13 +26,14 @@ describe('evaluateAnswer', () => {
         const { response } = await evaluateAnswer(
           'What is TypeScript?',
           {
-            action: "answer",
-            think: "Providing a clear definition of TypeScript",
-            answer: "TypeScript is a strongly typed programming language that builds on JavaScript.",
-            references: []
+            action: 'answer',
+            think: 'Providing a clear definition of TypeScript',
+            answer:
+              'TypeScript is a strongly typed programming language that builds on JavaScript.',
+            references: [],
           },
           ['definitive'],
-          tokenTracker
+          tokenTracker,
         );
         expect(response).toHaveProperty('pass');
         expect(response).toHaveProperty('think');
@@ -44,13 +45,13 @@ describe('evaluateAnswer', () => {
         const { response } = await evaluateAnswer(
           'List three programming languages.',
           {
-            action: "answer",
-            think: "Providing an example of a programming language",
-            answer: "Python is a programming language.",
-            references: []
+            action: 'answer',
+            think: 'Providing an example of a programming language',
+            answer: 'Python is a programming language.',
+            references: [],
           },
           ['plurality'],
-          tokenTracker
+          tokenTracker,
         );
         expect(response).toHaveProperty('pass');
         expect(response).toHaveProperty('think');
