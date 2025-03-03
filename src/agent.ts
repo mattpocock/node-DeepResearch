@@ -183,6 +183,11 @@ class AgentRunner {
         this.state.thisStep.codingIssue
       );
     },
+    runBeastMode: () => {
+      return (
+        this.state.thisStep.action === 'answer' && !this.state.thisStep.isFinal
+      );
+    },
   };
 
   loggers = {
@@ -212,6 +217,9 @@ class AgentRunner {
         .join(', ');
       console.log(`${this.state.thisStep.action} <- [${actionsStr}]`);
       console.log(this.state.thisStep);
+    },
+    beastMode: () => {
+      console.log('Enter Beast mode!!!');
     },
   };
 
@@ -589,12 +597,6 @@ In particular, you tried to search for the following keywords: "${keywordsQuerie
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
-      updateContext({
-        totalStep: this.state.totalStep,
-        question: this.currentQuestion,
-        ...thisStep,
-        result: results,
-      });
       anyResult = true;
     }
     if (!anyResult || !keywordsQueries?.length) {
@@ -729,7 +731,76 @@ You decided to think out of the box or cut from a completely different angle.`);
     );
   };
 
-  enterBeastMode = async () => {};
+  runBeastModeStep = async () => {
+    // any answer is better than no answer, humanity last resort
+    this.state.step++;
+    this.state.totalStep++;
+    const system = getPrompt(
+      this.state.diaryContext,
+      this.state.allQuestions,
+      this.state.allKeywords,
+      false,
+      false,
+      false,
+      false,
+      false,
+      this.state.badContext,
+      this.state.allKnowledge,
+      getUnvisitedURLs(this.state.allURLs, this.state.visitedURLs),
+      true,
+    );
+
+    const schema = this.SchemaGen.getAgentSchema(
+      false,
+      false,
+      true,
+      false,
+      false,
+    );
+    const result = await this.generator.generateObject({
+      model: 'agentBeastMode',
+      schema,
+      system,
+      messages: this.messages,
+    });
+    this.state.thisStep = result.object as AnswerAction;
+    this.state.thisStep.isFinal = true;
+
+    this.state.context.actionTracker.trackAction({
+      totalStep: this.state.totalStep,
+      thisStep: this.state.thisStep,
+      gaps: this.state.gaps,
+      badAttempts: this.state.badAttempts,
+    });
+
+    this.lastSchemaUsed = schema;
+    this.lastSystemPromptUsed = system;
+  };
+
+  getFinalResult = () => {
+    if (this.state.thisStep.action !== 'answer') {
+      throw new Error('Final step is not an answer');
+    }
+
+    if (!this.state.thisStep.isFinal) {
+      throw new Error('Attempted to getFinalStep on a step that was not final');
+    }
+    const finalStep = this.state.thisStep;
+
+    finalStep.mdAnswer = buildMdFromAnswer(finalStep);
+
+    return {
+      result: finalStep,
+      context: this.state.context,
+      visitedURLs: [
+        ...new Set([
+          ...this.state.visitedURLs,
+          ...Object.keys(this.state.allURLs),
+        ]),
+      ],
+      readURLs: this.state.visitedURLs,
+    };
+  };
 
   runStep = async () => {
     this.state.step++;
@@ -804,65 +875,15 @@ export async function getResponse(
 
   while (runner.should.continueNextStep()) {
     await runner.runStep();
-
-    await runner.printLocalFiles();
   }
 
-  await runner.printLocalFiles();
-  if (!(thisStep as AnswerAction).isFinal) {
-    console.log('Enter Beast mode!!!');
-    // any answer is better than no answer, humanity last resort
-    step++;
-    totalStep++;
-    system = getPrompt(
-      diaryContext,
-      allQuestions,
-      allKeywords,
-      false,
-      false,
-      false,
-      false,
-      false,
-      badContext,
-      allKnowledge,
-      getUnvisitedURLs(allURLs, visitedURLs),
-      true,
-    );
-
-    schema = SchemaGen.getAgentSchema(false, false, true, false, false);
-    const result = await generator.generateObject({
-      model: 'agentBeastMode',
-      schema,
-      system,
-      messages,
-    });
-    thisStep = result.object as AnswerAction;
-    (thisStep as AnswerAction).isFinal = true;
-    context.actionTracker.trackAction({
-      totalStep,
-      thisStep,
-      gaps,
-      badAttempts,
-    });
+  if (runner.should.runBeastMode()) {
+    await runner.runBeastModeStep();
   }
 
-  (thisStep as AnswerAction).mdAnswer = buildMdFromAnswer(
-    thisStep as AnswerAction,
-  );
-  console.log(thisStep);
+  const result = runner.getFinalResult();
 
-  await storeContext(
-    system,
-    schema,
-    [allContext, allKeywords, allQuestions, allKnowledge],
-    totalStep,
-  );
-  return {
-    result: thisStep,
-    context,
-    visitedURLs: [...new Set([...visitedURLs, ...Object.keys(allURLs)])],
-    readURLs: visitedURLs,
-  };
+  return result;
 }
 
 async function storeContext(
