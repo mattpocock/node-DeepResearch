@@ -12,7 +12,7 @@
   "defaults": {
     "search_provider": "jina",
     "llm_provider": "gemini",
-    "step_sleep": 100
+    "step_sleep": 5000
   },
   "providers": {
     "gemini": {

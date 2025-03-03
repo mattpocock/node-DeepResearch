@@ -128,7 +128,7 @@ export const removeExtraLineBreaks = (text: string) => {
 };
 
 export function chooseK(a: string[], k: number) {
-  // randomly sample k from `a` without repitition
+  // randomly sample k from `a` without repetition
   return a.sort(() => 0.5 - Math.random()).slice(0, k);
 }
 

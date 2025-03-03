@@ -84,9 +84,9 @@ export class ObjectGeneratorSafe {
     error: unknown,
   ): Promise<GenerateObjectResult<T>> {
     if (NoObjectGeneratedError.isInstance(error)) {
-      console.error(
-        'Object not generated according to schema, fallback to manual JSON parsing',
-      );
+      // console.error(
+      //   'Object not generated according to schema, fallback to manual JSON parsing',
+      // );
       try {
         const partialResponse = JSON.parse((error as any).text);
         return {

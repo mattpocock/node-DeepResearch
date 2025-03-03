@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 
 import { TokenUsage } from '../types';
 import { LanguageModelUsage } from 'ai';
+import { inspect } from 'util';
 
 export class TokenTracker extends EventEmitter {
   private usages: TokenUsage[] = [];
@@ -67,11 +68,21 @@ export class TokenTracker extends EventEmitter {
 
   printSummary() {
     const breakdown = this.getUsageBreakdown();
-    console.log('Token Usage Summary:', {
-      budget: this.budget,
-      total: this.getTotalUsage(),
-      breakdown,
-    });
+    console.log(
+      'Token Usage Summary:',
+      inspect(
+        {
+          budget: this.budget,
+          total: this.getTotalUsage(),
+          breakdown,
+        },
+        {
+          depth: null,
+          colors: true,
+          numericSeparator: true,
+        },
+      ),
+    );
   }
 
   reset() {
