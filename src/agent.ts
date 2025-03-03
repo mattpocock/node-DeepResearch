@@ -1,56 +1,51 @@
-import { ZodObject } from 'zod';
 import { CoreAssistantMessage, CoreUserMessage } from 'ai';
-import { SEARCH_PROVIDER, STEP_SLEEP } from './config';
-import { readUrl, removeAllLineBreaks } from './tools/read';
-import fs from 'fs/promises';
 import { SafeSearchType, search as duckSearch } from 'duck-duck-scrape';
+import fs from 'fs/promises';
+import { ZodObject } from 'zod';
+import { SEARCH_PROVIDER, STEP_SLEEP } from './config';
 import { braveSearch } from './tools/brave-search';
-import { rewriteQuery } from './tools/query-rewriter';
-import { dedupQueries } from './tools/jina-dedup';
-import { evaluateAnswer, evaluateQuestion } from './tools/evaluator';
 import { analyzeSteps } from './tools/error-analyzer';
-import { TokenTracker } from './utils/token-tracker';
-import { ActionTracker } from './utils/action-tracker';
+import { evaluateAnswer, evaluateQuestion } from './tools/evaluator';
+import { dedupQueries } from './tools/jina-dedup';
+import { search } from './tools/jina-search';
+import { rewriteQuery } from './tools/query-rewriter';
+import { readUrl, removeAllLineBreaks } from './tools/read';
 import {
-  StepAction,
   AnswerAction,
-  KnowledgeItem,
-  SearchResult,
   EvaluationType,
+  KnowledgeItem,
   ReflectAction,
   SearchAction,
+  SearchResult,
+  StepAction,
+  TrackerContext,
   VisitAction,
-  CodingAction,
 } from './types';
-import { TrackerContext } from './types';
-import { search } from './tools/jina-search';
+import { ActionTracker } from './utils/action-tracker';
+import { TokenTracker } from './utils/token-tracker';
 // import {grounding} from "./tools/grounding";
+import dedent from 'dedent';
+import { setTimeout } from 'timers/promises';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { ObjectGeneratorSafe } from './utils/safe-generator';
-import { CodeSandbox } from './tools/code-sandbox';
+import { getPrompt } from './get-prompt';
 import { serperSearch } from './tools/serper-search';
-import { getUnvisitedURLs, normalizeUrl } from './utils/url-tools';
-import {
-  buildMdFromAnswer,
-  chooseK,
-  removeExtraLineBreaks,
-  removeHTMLtags,
-} from './utils/text-tools';
+import { ObjectGeneratorSafe } from './utils/safe-generator';
 import {
   MAX_QUERIES_PER_STEP,
   MAX_REFLECT_PER_STEP,
   MAX_URLS_PER_STEP,
   Schemas,
 } from './utils/schemas';
-import dedent from 'dedent';
-import { setTimeout } from 'timers/promises';
-import { getPrompt } from './get-prompt';
+import { buildMdFromAnswer, chooseK, removeHTMLtags } from './utils/text-tools';
+import { getUnvisitedURLs, normalizeUrl } from './utils/url-tools';
 
 const allContext: StepAction[] = []; // all steps in the current session, including those leads to wrong results
 
 function updateContext(step: any) {
   allContext.push(step);
 }
+
+class EarlyBreakError extends Error {}
 
 type State = {
   step: number;
@@ -73,10 +68,6 @@ type State = {
   visitedURLs: string[];
   evaluationMetrics: Record<string, EvaluationType[]>;
   tokenBudget: number;
-};
-
-type Event = {
-  type: 'NEW_STEP';
 };
 
 class AgentRunner {
@@ -302,7 +293,7 @@ class AgentRunner {
     if (this.state.step === 1) {
       // LLM is so confident and answer immediately, skip all evaluations
       thisStep.isFinal = true;
-      return;
+      throw new EarlyBreakError('Early break');
     }
 
     updateContext({
@@ -353,13 +344,13 @@ class AgentRunner {
           answered the original question. Congratulations! 🎉
         `);
         thisStep.isFinal = true;
-        return;
+        throw new EarlyBreakError('Early break');
       } else {
-        if (this.state.badAttempts >= 3) {
+        if (this.state.badAttempts >= this.maxBadAttempts) {
           thisStep.isFinal = false;
-          return;
+          throw new EarlyBreakError('Max bad attempts exceeded');
         } else {
-          this.state.diaryContext.push(`
+          this.state.diaryContext.push(dedent`
 At step ${this.state.step}, you took **answer** action but evaluator thinks it is not a good answer:
 
 Original question: 
@@ -874,7 +865,14 @@ export async function getResponse(
   });
 
   while (runner.should.continueNextStep()) {
-    await runner.runStep();
+    try {
+      await runner.runStep();
+    } catch (e) {
+      if (e instanceof EarlyBreakError) {
+        break;
+      }
+      throw e;
+    }
   }
 
   if (runner.should.runBeastMode()) {
