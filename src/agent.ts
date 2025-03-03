@@ -881,10 +881,16 @@ export async function getResponse(
       }
       throw e;
     }
+
+    await runner.printLocalFiles();
   }
+
+  await runner.printLocalFiles();
 
   if (runner.should.runBeastMode()) {
     await runner.runBeastModeStep();
+
+    await runner.printLocalFiles();
   }
 
   const result = runner.getFinalResult();
