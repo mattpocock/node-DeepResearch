@@ -218,8 +218,6 @@ function getPrompt(query: string, think: string): string {
 `;
 }
 
-const TOOL_NAME = 'queryRewriter';
-
 export async function rewriteQuery(
   action: SearchAction,
   trackers: TrackerContext,
@@ -232,7 +230,7 @@ export async function rewriteQuery(
     const queryPromises = action.searchRequests.map(async (req) => {
       const prompt = getPrompt(req, action.think);
       const result = await generator.generateObject({
-        model: TOOL_NAME,
+        model: 'queryRewriter',
         schema: schemaGen.getQueryRewriterSchema(),
         prompt,
       });
@@ -242,10 +240,10 @@ export async function rewriteQuery(
 
     const queryResults = await Promise.all(queryPromises);
     queryResults.forEach((queries) => allQueries.push(...queries));
-    console.log(TOOL_NAME, allQueries);
+    console.log('queryRewriter', allQueries);
     return { queries: allQueries };
   } catch (error) {
-    console.error(`Error in ${TOOL_NAME}`, error);
+    console.error(`Error in queryRewriter`, error);
     throw error;
   }
 }

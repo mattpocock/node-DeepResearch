@@ -45,7 +45,10 @@ function updateContext(step: any) {
   allContext.push(step);
 }
 
-class EarlyBreakError extends Error {}
+/**
+ * Used to break out of the while loop
+ */
+class EarlyBreak extends Error {}
 
 type State = {
   step: number;
@@ -54,7 +57,7 @@ type State = {
   context: TrackerContext;
   gaps: string[];
   allQuestions: string[];
-  allKeywords: string[];
+  allSearchQueries: string[];
   allKnowledge: KnowledgeItem[];
   badContext: any[];
   diaryContext: string[];
@@ -102,7 +105,7 @@ class AgentRunner {
         actionTracker:
           opts.existingContext?.actionTracker || new ActionTracker(),
       },
-      allKeywords: [],
+      allSearchQueries: [],
       allQuestions: [],
       allKnowledge: [],
       badContext: [],
@@ -233,7 +236,7 @@ class AgentRunner {
     const systemPrompt = getPrompt(
       this.state.diaryContext,
       this.state.allQuestions,
-      this.state.allKeywords,
+      this.state.allSearchQueries,
       this.state.allowReflect,
       this.state.allowAnswer,
       this.state.allowRead,
@@ -293,7 +296,7 @@ class AgentRunner {
     if (this.state.step === 1) {
       // LLM is so confident and answer immediately, skip all evaluations
       thisStep.isFinal = true;
-      throw new EarlyBreakError('Early break');
+      throw new EarlyBreak('Early break');
     }
 
     updateContext({
@@ -325,6 +328,8 @@ class AgentRunner {
       this.SchemaGen,
     );
 
+    // If the current question we're on is the initial question,
+    // then if evaluations pass, we're done.
     if (this.currentQuestion.trim() === this.initialQuestion) {
       if (evaluation.pass) {
         this.state.diaryContext.push(dedent`
@@ -344,24 +349,24 @@ class AgentRunner {
           answered the original question. Congratulations! 🎉
         `);
         thisStep.isFinal = true;
-        throw new EarlyBreakError('Early break');
+        throw new EarlyBreak('Early break');
       } else {
         if (this.state.badAttempts >= this.maxBadAttempts) {
           thisStep.isFinal = false;
-          throw new EarlyBreakError('Max bad attempts exceeded');
+          throw new EarlyBreak('Max bad attempts exceeded');
         } else {
           this.state.diaryContext.push(dedent`
-At step ${this.state.step}, you took **answer** action but evaluator thinks it is not a good answer:
+            At step ${this.state.step}, you took **answer** action but evaluator thinks it is not a good answer:
 
-Original question: 
-${this.currentQuestion}
+            Original question: 
+            ${this.currentQuestion}
 
-Your answer: 
-${thisStep.answer}
+            Your answer: 
+            ${thisStep.answer}
 
-The evaluator thinks your answer is bad because: 
-${evaluation.think}
-`);
+            The evaluator thinks your answer is bad because: 
+            ${evaluation.think}
+          `);
           // store the bad context and reset the diary context
           const errorAnalysis = await analyzeSteps(
             this.state.diaryContext,
@@ -401,8 +406,11 @@ ${evaluation.think}
           this.state.step = 0;
         }
       }
+      // If the current question is not the initial question,
+      // but we got some good information, add it to the diary
+      // and move on
     } else if (evaluation.pass) {
-      this.state.diaryContext.push(`
+      this.state.diaryContext.push(dedent`
         At step ${this.state.step}, you took **answer** action. You
         found a good answer to the sub-question:
 
@@ -418,7 +426,7 @@ ${evaluation.think}
         Although you solved a sub-question, you still need
         to find the answer to the original question.
         You need to keep going.
-        `);
+      `);
       this.state.allKnowledge.push({
         question: this.currentQuestion,
         answer: thisStep.answer,
@@ -446,17 +454,17 @@ ${evaluation.think}
     if (newGapQuestions.length > 0) {
       // found new gap questions
       this.state.diaryContext.push(dedent`
-      At step ${this.state.step}, you took **reflect** and think
-      about the knowledge gaps.
-      You found some sub-questions are important to the
-      question: "${this.currentQuestion}"
-      You realize you need to know the answers to the
-      following sub-questions:
-      ${newGapQuestions.map((q: string) => `- ${q}`).join('\n')}
+        At step ${this.state.step}, you took **reflect** and think
+        about the knowledge gaps.
+        You found some sub-questions are important to the
+        question: "${this.currentQuestion}"
+        You realize you need to know the answers to the
+        following sub-questions:
+        ${newGapQuestions.map((q: string) => `- ${q}`).join('\n')}
 
-      You will now figure out the answers to these
-      sub-questions and see if they can help you find
-      the answer to the original question.
+        You will now figure out the answers to these
+        sub-questions and see if they can help you find
+        the answer to the original question.
       `);
       this.state.gaps.push(...newGapQuestions);
       this.state.allQuestions.push(...newGapQuestions);
@@ -507,7 +515,7 @@ ${evaluation.think}
       (
         await dedupQueries(
           keywordsQueries,
-          this.state.allKeywords,
+          this.state.allSearchQueries,
           this.state.context.tokenTracker,
         )
       ).unique_queries,
@@ -570,10 +578,10 @@ ${evaluation.think}
         }));
 
         minResults.forEach((r) => (this.state.allURLs[r.url] = r));
-        this.state.allKeywords.push(query);
+        this.state.allSearchQueries.push(query);
 
         this.state.allKnowledge.push({
-          question: `What do Internet say about "${query}"?`,
+          question: `What does the Internet say about "${query}"?`,
           answer: removeHTMLtags(
             minResults.map((r) => r.description).join('; '),
           ),
@@ -591,12 +599,12 @@ You found quite some information and add them to your URL list and **visit** the
       anyResult = true;
     }
     if (!anyResult || !keywordsQueries?.length) {
-      this.state.diaryContext.push(`
-At step ${this.state.step}, you took the **search** action and look for external information for the question: "${this.currentQuestion}".
-In particular, you tried to search for the following keywords: ${keywordsQueries.join(', ')}. 
-But then you realized you have already searched for these keywords before, no new information is returned.
-You decided to think out of the box or cut from a completely different angle.
-`);
+      this.state.diaryContext.push(dedent`
+        At step ${this.state.step}, you took the **search** action and look for external information for the question: "${this.currentQuestion}".
+        In particular, you tried to search for the following keywords: ${keywordsQueries.join(', ')}. 
+        But then you realized you have already searched for these keywords before, no new information is returned.
+        You decided to think out of the box or cut from a completely different angle.
+      `);
 
       updateContext({
         totalStep: this.state.totalStep,
@@ -714,7 +722,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       this.lastSchemaUsed,
       [
         allContext,
-        this.state.allKeywords,
+        this.state.allSearchQueries,
         this.state.allQuestions,
         this.state.allKnowledge,
       ],
@@ -729,7 +737,7 @@ You decided to think out of the box or cut from a completely different angle.`);
     const system = getPrompt(
       this.state.diaryContext,
       this.state.allQuestions,
-      this.state.allKeywords,
+      this.state.allSearchQueries,
       false,
       false,
       false,
@@ -868,7 +876,7 @@ export async function getResponse(
     try {
       await runner.runStep();
     } catch (e) {
-      if (e instanceof EarlyBreakError) {
+      if (e instanceof EarlyBreak) {
         break;
       }
       throw e;
